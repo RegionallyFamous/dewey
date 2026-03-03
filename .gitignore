@@ -1,0 +1,24 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build / release artifacts
+dist/
+releases/
+*.zip
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log

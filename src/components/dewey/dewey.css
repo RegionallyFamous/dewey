@@ -1,0 +1,577 @@
+/**
+ * dewey.css
+ *
+ * Styles and animations for the Dewey character component.
+ * Import in your plugin's main stylesheet or directly in the component.
+ * 
+ * All classnames are prefixed with "dewey-" to avoid WP admin conflicts.
+ */
+
+/* ─── Container ──────────────────────────────────────────────────────────────── */
+
+.dewey-character {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 12px;
+	position: relative;
+	user-select: none;
+}
+
+/* ─── Speech bubble ──────────────────────────────────────────────────────────── */
+
+.dewey-speech-bubble {
+	background: #fdf6e3;
+	color: #1b3a28;
+	border-radius: 14px 14px 14px 4px;
+	padding: 10px 14px;
+	font-size: 13px;
+	font-weight: 700;
+	line-height: 1.45;
+	max-width: 240px;
+	position: relative;
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), 0 0 0 1.5px rgba(181, 136, 90, 0.2);
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+	/* Smooth text transitions between states */
+	transition: opacity 0.15s ease;
+}
+
+.dewey-speech-bubble::after {
+	content: "";
+	position: absolute;
+	bottom: -9px;
+	left: 18px;
+	width: 18px;
+	height: 18px;
+	background: #fdf6e3;
+	clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+/* ─── Character wrap ─────────────────────────────────────────────────────────── */
+
+.dewey-wrap {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+/* ─── Particles ──────────────────────────────────────────────────────────────── */
+
+.dewey-particles {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	overflow: visible;
+}
+
+.dewey-particle {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+	line-height: 1;
+}
+
+/* ─── Body animations ────────────────────────────────────────────────────────── */
+
+@keyframes dewey-float {
+
+	0%,
+ 100% {
+		transform: translateY(0) rotate(-1deg);
+	}
+
+	50% {
+		transform: translateY(-9px) rotate(1deg);
+	}
+}
+
+@keyframes dewey-wobble {
+
+	0%,
+ 100% {
+		transform: rotate(-3deg) translateY(-4px);
+	}
+
+	25% {
+		transform: rotate(3deg) translateY(-6px);
+	}
+
+	50% {
+		transform: rotate(-2deg) translateY(-9px);
+	}
+
+	75% {
+		transform: rotate(2deg) translateY(-5px);
+	}
+}
+
+@keyframes dewey-bounce {
+
+	0%,
+ 100% {
+		transform: translateY(0) scale(1) rotate(0deg);
+	}
+
+	20% {
+		transform: translateY(-22px) scale(1.1) rotate(-5deg);
+	}
+
+	40% {
+		transform: translateY(-8px) scale(1.05) rotate(3deg);
+	}
+
+	60% {
+		transform: translateY(-17px) scale(1.08) rotate(-3deg);
+	}
+
+	80% {
+		transform: translateY(-5px) scale(1.02) rotate(2deg);
+	}
+}
+
+@keyframes dewey-dance {
+
+	0% {
+		transform: rotate(-8deg) translateY(0) scale(1);
+	}
+
+	12.5% {
+		transform: rotate(8deg) translateY(-11px) scale(1.06);
+	}
+
+	25% {
+		transform: rotate(-6deg) translateY(-5px) scale(1.02);
+	}
+
+	37.5% {
+		transform: rotate(6deg) translateY(-14px) scale(1.07);
+	}
+
+	50% {
+		transform: rotate(-8deg) translateY(-3px) scale(1.01);
+	}
+
+	62.5% {
+		transform: rotate(8deg) translateY(-15px) scale(1.08);
+	}
+
+	75% {
+		transform: rotate(-5deg) translateY(-7px) scale(1.03);
+	}
+
+	87.5% {
+		transform: rotate(5deg) translateY(-11px) scale(1.05);
+	}
+
+	100% {
+		transform: rotate(-8deg) translateY(0) scale(1);
+	}
+}
+
+@keyframes dewey-droop {
+
+	0%,
+ 100% {
+		transform: rotate(-4deg) translateY(5px);
+	}
+
+	50% {
+		transform: rotate(-4deg) translateY(11px);
+	}
+}
+
+@keyframes dewey-scan {
+
+	0%,
+ 100% {
+		transform: translateX(0) rotate(-2deg);
+	}
+
+	25% {
+		transform: translateX(-13px) rotate(-4deg);
+	}
+
+	75% {
+		transform: translateX(13px) rotate(4deg);
+	}
+}
+
+@keyframes dewey-shocked {
+
+	0% {
+		transform: scale(1) rotate(0deg);
+	}
+
+	10% {
+		transform: scale(1.22) rotate(-5deg) translateY(-16px);
+	}
+
+	20% {
+		transform: scale(0.94) rotate(5deg) translateY(-5px);
+	}
+
+	30% {
+		transform: scale(1.12) rotate(-3deg) translateY(-11px);
+	}
+
+	100% {
+		transform: scale(1) rotate(0deg);
+	}
+}
+
+@keyframes dewey-page-flutter {
+
+	0%,
+ 100% {
+		transform: rotate(0deg);
+	}
+
+	25% {
+		transform: rotate(9deg);
+	}
+
+	75% {
+		transform: rotate(-7deg);
+	}
+}
+
+/* ─── Eye animations ─────────────────────────────────────────────────────────── */
+
+@keyframes dewey-blink {
+
+	0%,
+ 87%,
+ 100% {
+		transform: scaleY(1);
+	}
+
+	92% {
+		transform: scaleY(0.04);
+	}
+}
+
+@keyframes dewey-eye-think {
+
+	0%,
+ 100% {
+		transform: scaleY(1);
+	}
+
+	50% {
+		transform: scaleY(0.55) translateY(2px);
+	}
+}
+
+@keyframes dewey-eye-happy {
+
+	0%,
+ 100% {
+		transform: scaleY(1);
+	}
+
+	50% {
+		transform: scaleY(0.65) translateY(-1px);
+	}
+}
+
+@keyframes dewey-eye-sad {
+
+	0%,
+ 100% {
+		transform: scaleY(1);
+	}
+
+	50% {
+		transform: scaleY(0.75) translateY(4px);
+	}
+}
+
+@keyframes dewey-eye-shock {
+
+	0%,
+ 100% {
+		transform: scale(1);
+	}
+
+	15% {
+		transform: scale(1.45);
+	}
+
+	30% {
+		transform: scale(1.2);
+	}
+}
+
+/* ─── Pupil animations ───────────────────────────────────────────────────────── */
+
+@keyframes dewey-pupil-dart {
+
+	0%,
+ 100% {
+		transform: translate(0, 0);
+	}
+
+	25% {
+		transform: translate(-3px, -1px);
+	}
+
+	50% {
+		transform: translate(3px, 1px);
+	}
+
+	75% {
+		transform: translate(-2px, 2px);
+	}
+}
+
+@keyframes dewey-pupil-up {
+
+	0%,
+ 100% {
+		transform: translateY(0);
+	}
+
+	50% {
+		transform: translateY(-2px);
+	}
+}
+
+/* ─── Particle float animations ──────────────────────────────────────────────── */
+
+@keyframes dewey-pf1 {
+
+	0% {
+		opacity: 0;
+		transform: translate(0, 0) scale(0.5);
+	}
+
+	20% {
+		opacity: 1;
+		transform: translate(-20px, -32px) scale(1);
+	}
+
+	100% {
+		opacity: 0;
+		transform: translate(-42px, -84px) scale(0.8);
+	}
+}
+
+@keyframes dewey-pf2 {
+
+	0% {
+		opacity: 0;
+		transform: translate(0, 0) scale(0.5);
+	}
+
+	20% {
+		opacity: 1;
+		transform: translate(26px, -27px) scale(1);
+	}
+
+	100% {
+		opacity: 0;
+		transform: translate(52px, -74px) scale(0.8);
+	}
+}
+
+@keyframes dewey-pf3 {
+
+	0% {
+		opacity: 0;
+		transform: translate(0, 0) scale(0.5);
+	}
+
+	20% {
+		opacity: 1;
+		transform: translate(-11px, -42px) scale(1);
+	}
+
+	100% {
+		opacity: 0;
+		transform: translate(-22px, -92px) scale(0.7);
+	}
+}
+
+@keyframes dewey-pf4 {
+
+	0% {
+		opacity: 0;
+		transform: translate(0, 0) scale(0.5);
+	}
+
+	20% {
+		opacity: 1;
+		transform: translate(17px, -37px) scale(1);
+	}
+
+	100% {
+		opacity: 0;
+		transform: translate(34px, -88px) scale(0.7);
+	}
+}
+
+/* ─── State: idle ────────────────────────────────────────────────────────────── */
+
+.dewey-state-idle #dewey-group {
+	animation: dewey-float 3s ease-in-out infinite;
+	filter:
+		drop-shadow(0 9px 22px rgba(0, 0, 0, 0.55))
+		drop-shadow(0 0 14px rgba(45, 106, 79, 0.3));
+}
+
+.dewey-state-idle .dewey-eye-l,
+.dewey-state-idle .dewey-eye-r {
+	animation: dewey-blink 4s ease-in-out infinite;
+	transform-origin: center;
+}
+
+.dewey-state-idle .dewey-eye-r {
+	animation-delay: 0.13s;
+}
+
+.dewey-state-idle .dewey-pupil-l,
+.dewey-state-idle .dewey-pupil-r {
+	animation: dewey-pupil-up 3s ease-in-out infinite;
+}
+
+/* ─── State: searching ───────────────────────────────────────────────────────── */
+
+.dewey-state-searching #dewey-group {
+	animation: dewey-scan 1.5s ease-in-out infinite;
+	filter: drop-shadow(0 6px 18px rgba(45, 106, 79, 0.5));
+}
+
+.dewey-state-searching .dewey-eye-l,
+.dewey-state-searching .dewey-eye-r {
+	animation: dewey-eye-think 0.6s ease-in-out infinite;
+	transform-origin: center;
+}
+
+.dewey-state-searching .dewey-pupil-l,
+.dewey-state-searching .dewey-pupil-r {
+	animation: dewey-pupil-dart 0.5s ease-in-out infinite;
+}
+
+/* ─── State: thinking ────────────────────────────────────────────────────────── */
+
+.dewey-state-thinking #dewey-group {
+	animation: dewey-wobble 1.2s ease-in-out infinite;
+	filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45));
+}
+
+.dewey-state-thinking .dewey-eye-l,
+.dewey-state-thinking .dewey-eye-r {
+	animation: dewey-eye-think 1s ease-in-out infinite;
+	transform-origin: center;
+}
+
+.dewey-state-thinking .dewey-pupil-l,
+.dewey-state-thinking .dewey-pupil-r {
+	animation: dewey-pupil-dart 0.8s ease-in-out infinite;
+}
+
+.dewey-state-thinking .dewey-page-right {
+	animation: dewey-page-flutter 0.8s ease-in-out infinite;
+	transform-origin: left center;
+}
+
+/* ─── State: found ───────────────────────────────────────────────────────────── */
+
+.dewey-state-found #dewey-group {
+	animation:
+		dewey-bounce 0.7s ease-in-out 3,
+		dewey-float 3s 2.1s ease-in-out infinite;
+	filter: drop-shadow(0 0 26px rgba(181, 136, 90, 0.65));
+}
+
+.dewey-state-found .dewey-eye-l,
+.dewey-state-found .dewey-eye-r {
+	animation: dewey-eye-happy 0.4s ease-in-out infinite;
+	transform-origin: center;
+}
+
+/* ─── State: dancing ─────────────────────────────────────────────────────────── */
+
+.dewey-state-dancing #dewey-group {
+	animation: dewey-dance 0.6s ease-in-out infinite;
+	filter: drop-shadow(0 0 30px rgba(181, 136, 90, 0.85));
+}
+
+.dewey-state-dancing .dewey-eye-l,
+.dewey-state-dancing .dewey-eye-r {
+	animation: dewey-eye-happy 0.3s ease-in-out infinite;
+	transform-origin: center;
+}
+
+/* ─── State: sad ─────────────────────────────────────────────────────────────── */
+
+.dewey-state-sad #dewey-group {
+	animation: dewey-droop 2s ease-in-out infinite;
+	filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.5));
+}
+
+.dewey-state-sad .dewey-eye-l,
+.dewey-state-sad .dewey-eye-r {
+	animation: dewey-eye-sad 2s ease-in-out infinite;
+	transform-origin: center;
+}
+
+/* ─── State: shocked ─────────────────────────────────────────────────────────── */
+
+.dewey-state-shocked #dewey-group {
+	animation: dewey-shocked 0.8s ease-in-out;
+	filter: drop-shadow(0 0 22px rgba(155, 35, 53, 0.65));
+}
+
+.dewey-state-shocked .dewey-eye-l,
+.dewey-state-shocked .dewey-eye-r {
+	animation: dewey-eye-shock 0.8s ease-in-out;
+	transform-origin: center;
+}
+
+/* ─── State: hello ───────────────────────────────────────────────────────────── */
+
+.dewey-state-hello #dewey-group {
+	animation:
+		dewey-bounce 0.5s ease-in-out 4,
+		dewey-float 3s 2s ease-in-out infinite;
+	filter: drop-shadow(0 0 22px rgba(181, 136, 90, 0.55));
+}
+
+.dewey-state-hello .dewey-eye-l,
+.dewey-state-hello .dewey-eye-r {
+	animation: dewey-eye-happy 0.4s ease-in-out infinite;
+	transform-origin: center;
+}
+
+/* ─── State: tired ───────────────────────────────────────────────────────────── */
+
+.dewey-state-tired #dewey-group {
+	animation: dewey-droop 3s ease-in-out infinite;
+	filter: drop-shadow(0 4px 9px rgba(0, 0, 0, 0.45));
+}
+
+.dewey-state-tired .dewey-eye-l,
+.dewey-state-tired .dewey-eye-r {
+	animation: dewey-eye-think 2.5s ease-in-out infinite;
+	transform-origin: center;
+}
+
+/* ─── Reduced motion support ─────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+
+	.dewey-wrap *,
+	.dewey-wrap #dewey-group,
+	.dewey-wrap .dewey-eye-l,
+	.dewey-wrap .dewey-eye-r,
+	.dewey-wrap .dewey-pupil-l,
+	.dewey-wrap .dewey-pupil-r,
+	.dewey-wrap .dewey-page-right,
+	.dewey-particle {
+		animation: none !important;
+	}
+}
