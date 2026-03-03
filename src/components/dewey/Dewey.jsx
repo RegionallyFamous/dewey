@@ -5,7 +5,7 @@
  * A friendly animated character that reacts to query states.
  */
 
-import { useEffect, useRef, useState } from '@wordpress/element';
+import { memo, useEffect, useMemo, useRef, useState } from '@wordpress/element';
 
 const STATE_CONFIG = {
 	idle: {
@@ -80,19 +80,221 @@ const BROW_PATHS = {
 	shocked: [ 'M62 54 Q74 50 86 54', 'M84 54 Q96 50 108 54' ],
 };
 
-function Particle( { emoji, style } ) {
+const PAGE_LINE_YS = [ 75, 83, 91, 99, 107, 115, 123, 131 ];
+const THEME_ACCENT = 'var(--wp-admin-theme-color, #2271b1)';
+const THEME_ACCENT_DARK = 'var(--wp-admin-theme-color-darker-10, #135e96)';
+const DEWEY_BASE_900 = 'var(--dewey-base-900, #1b4332)';
+const DEWEY_BASE_850 = 'var(--dewey-base-850, #243d30)';
+const DEWEY_BASE_700 = 'var(--dewey-base-700, #2d6a4f)';
+const DEWEY_BASE_600 = 'var(--dewey-base-600, #3d8a6a)';
+const DEWEY_PAPER_100 = 'var(--dewey-paper-100, #fdf6e3)';
+const DEWEY_PAPER_200 = 'var(--dewey-paper-200, #f5edd6)';
+const DEWEY_PAPER_LINE = 'var(--dewey-paper-line, #c4b898)';
+const DEWEY_PAPER_SPINE = 'var(--dewey-paper-spine, #b0a07a)';
+const DEWEY_BLUSH = 'var(--dewey-blush, rgba(205,110,80,0.26))';
+const DEWEY_PUPIL_DARK = 'var(--dewey-pupil-dark, #0d2015)';
+const DEWEY_PUPIL_LIGHT = 'var(--dewey-pupil-light, #1e4a2a)';
+const DEFAULT_ACCENT_HEX = '#2271b1';
+
+function clampChannel( value ) {
+	return Math.max( 0, Math.min( 255, Math.round( value ) ) );
+}
+
+function parseHexColor( color ) {
+	const raw = color.trim().replace( '#', '' );
+	if ( raw.length === 3 ) {
+		const [ r, g, b ] = raw.split( '' );
+		return {
+			r: parseInt( `${ r }${ r }`, 16 ),
+			g: parseInt( `${ g }${ g }`, 16 ),
+			b: parseInt( `${ b }${ b }`, 16 ),
+		};
+	}
+	if ( raw.length === 6 ) {
+		return {
+			r: parseInt( raw.slice( 0, 2 ), 16 ),
+			g: parseInt( raw.slice( 2, 4 ), 16 ),
+			b: parseInt( raw.slice( 4, 6 ), 16 ),
+		};
+	}
+	return null;
+}
+
+function parseRgbColor( color ) {
+	const match = color
+		.trim()
+		.match( /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/i );
+	if ( ! match ) {
+		return null;
+	}
+	return {
+		r: clampChannel( Number( match[ 1 ] ) ),
+		g: clampChannel( Number( match[ 2 ] ) ),
+		b: clampChannel( Number( match[ 3 ] ) ),
+	};
+}
+
+function parseColor( color ) {
+	if ( ! color || typeof color !== 'string' ) {
+		return null;
+	}
+	if ( color.trim().startsWith( '#' ) ) {
+		return parseHexColor( color );
+	}
+	if ( color.trim().startsWith( 'rgb' ) ) {
+		return parseRgbColor( color );
+	}
+	return null;
+}
+
+function mix( from, to, amount ) {
+	return {
+		r: clampChannel( from.r + ( to.r - from.r ) * amount ),
+		g: clampChannel( from.g + ( to.g - from.g ) * amount ),
+		b: clampChannel( from.b + ( to.b - from.b ) * amount ),
+	};
+}
+
+function shade( color, amount ) {
+	if ( amount >= 0 ) {
+		return mix( color, { r: 255, g: 255, b: 255 }, amount );
+	}
+	return mix( color, { r: 0, g: 0, b: 0 }, Math.abs( amount ) );
+}
+
+function toHex( color ) {
+	const toPair = ( value ) =>
+		clampChannel( value ).toString( 16 ).padStart( 2, '0' );
+	return `#${ toPair( color.r ) }${ toPair( color.g ) }${ toPair(
+		color.b
+	) }`;
+}
+
+function toRgba( color, alpha ) {
+	return `rgba(${ clampChannel( color.r ) }, ${ clampChannel(
+		color.g
+	) }, ${ clampChannel( color.b ) }, ${ alpha })`;
+}
+
+function getRelativeLuminance( color ) {
+	const toLinear = ( channel ) => {
+		const value = channel / 255;
+		return value <= 0.03928
+			? value / 12.92
+			: Math.pow( ( value + 0.055 ) / 1.055, 2.4 );
+	};
+	const r = toLinear( color.r );
+	const g = toLinear( color.g );
+	const b = toLinear( color.b );
+	return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function isDarkAdminScheme() {
+	if ( typeof document === 'undefined' || ! document.body ) {
+		return false;
+	}
+
+	const classes = document.body.classList;
+	return (
+		classes.contains( 'admin-color-midnight' ) ||
+		classes.contains( 'admin-color-ocean' ) ||
+		classes.contains( 'admin-color-coffee' ) ||
+		classes.contains( 'admin-color-ectoplasm' )
+	);
+}
+
+function getAdminAccentColor() {
+	if ( typeof window === 'undefined' ) {
+		return parseHexColor( DEFAULT_ACCENT_HEX );
+	}
+	const rootStyles = window.getComputedStyle?.( document.documentElement );
+	const fromVar = rootStyles
+		?.getPropertyValue( '--wp-admin-theme-color' )
+		?.trim();
+	return parseColor( fromVar ) || parseHexColor( DEFAULT_ACCENT_HEX );
+}
+
+function getDeweyThemeVars() {
+	const accent = getAdminAccentColor();
+	const accentLuminance = getRelativeLuminance( accent );
+	const treatAsDarkScheme = isDarkAdminScheme() || accentLuminance < 0.2;
+	const tone = treatAsDarkScheme
+		? {
+				base900: -0.46,
+				base850: -0.38,
+				base700: -0.22,
+				base600: -0.08,
+				paper100: 0.94,
+				paper200: 0.9,
+				paperLine: 0.68,
+				paperSpine: 0.56,
+				pupilDark: -0.64,
+				pupilLight: -0.5,
+				blushMix: 0.38,
+				blushAlpha: 0.3,
+		  }
+		: {
+				base900: -0.56,
+				base850: -0.48,
+				base700: -0.34,
+				base600: -0.18,
+				paper100: 0.9,
+				paper200: 0.84,
+				paperLine: 0.62,
+				paperSpine: 0.5,
+				pupilDark: -0.72,
+				pupilLight: -0.58,
+				blushMix: 0.32,
+				blushAlpha: 0.26,
+		  };
+
+	return {
+		'--dewey-accent': toHex( accent ),
+		'--dewey-accent-dark': toHex( shade( accent, -0.2 ) ),
+		'--dewey-accent-soft': toRgba( accent, 0.24 ),
+		'--dewey-accent-glow': toRgba( accent, 0.62 ),
+		'--dewey-base-900': toHex( shade( accent, tone.base900 ) ),
+		'--dewey-base-850': toHex( shade( accent, tone.base850 ) ),
+		'--dewey-base-700': toHex( shade( accent, tone.base700 ) ),
+		'--dewey-base-600': toHex( shade( accent, tone.base600 ) ),
+		'--dewey-paper-100': toHex( shade( accent, tone.paper100 ) ),
+		'--dewey-paper-200': toHex( shade( accent, tone.paper200 ) ),
+		'--dewey-paper-line': toHex( shade( accent, tone.paperLine ) ),
+		'--dewey-paper-spine': toHex( shade( accent, tone.paperSpine ) ),
+		'--dewey-blush': toRgba(
+			mix( accent, { r: 205, g: 110, b: 80 }, tone.blushMix ),
+			tone.blushAlpha
+		),
+		'--dewey-pupil-dark': toHex( shade( accent, tone.pupilDark ) ),
+		'--dewey-pupil-light': toHex( shade( accent, tone.pupilLight ) ),
+	};
+}
+
+function prefersReducedMotion() {
+	if (
+		typeof window === 'undefined' ||
+		typeof window.matchMedia !== 'function'
+	) {
+		return false;
+	}
+
+	return window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
+}
+
+const Particle = memo( function Particle( { emoji, style } ) {
 	return (
 		<div className="dewey-particle" style={ style }>
 			{ emoji }
 		</div>
 	);
-}
+} );
 
-export default function Dewey( {
+function Dewey( {
 	state = 'idle',
 	onSpeechChange,
 	className = '',
 	showSpeech = true,
+	showParticles = true,
 	size = 170,
 	speech,
 } ) {
@@ -101,7 +303,9 @@ export default function Dewey( {
 		STATE_CONFIG[ state ]?.speech ?? STATE_CONFIG.idle.speech
 	);
 	const particleIntervalRef = useRef( null );
+	const particleCleanupRef = useRef( null );
 	const particleIdRef = useRef( 0 );
+	const reducedMotion = useMemo( () => prefersReducedMotion(), [] );
 
 	const safeState = STATE_CONFIG[ state ] ? state : 'idle';
 	const config = STATE_CONFIG[ safeState ];
@@ -117,10 +321,18 @@ export default function Dewey( {
 			clearInterval( particleIntervalRef.current );
 			particleIntervalRef.current = null;
 		}
+		if ( particleCleanupRef.current ) {
+			clearTimeout( particleCleanupRef.current );
+			particleCleanupRef.current = null;
+		}
 
 		setParticles( [] );
 
-		if ( config.particles.length === 0 ) {
+		if (
+			! showParticles ||
+			reducedMotion ||
+			config.particles.length === 0
+		) {
 			return undefined;
 		}
 
@@ -151,7 +363,7 @@ export default function Dewey( {
 
 			setParticles( ( prev ) => [ ...prev, ...newParticles ] );
 
-			setTimeout( () => {
+			particleCleanupRef.current = setTimeout( () => {
 				setParticles( ( prev ) =>
 					prev.filter(
 						( particle ) => particle.removeAt > Date.now()
@@ -170,16 +382,42 @@ export default function Dewey( {
 			if ( particleIntervalRef.current ) {
 				clearInterval( particleIntervalRef.current );
 			}
+			if ( particleCleanupRef.current ) {
+				clearTimeout( particleCleanupRef.current );
+			}
 		};
-	}, [ config.loop, config.particles, safeState ] );
+	}, [
+		config.loop,
+		config.particles,
+		reducedMotion,
+		safeState,
+		showParticles,
+	] );
 
 	const browPaths = BROW_PATHS[ config.brows ] ?? BROW_PATHS.normal;
 	const scale = size / 170;
+	const themeVars = useMemo( () => getDeweyThemeVars(), [] );
+	const characterStyle = useMemo(
+		() => ( { '--dewey-scale': scale, ...themeVars } ),
+		[ scale, themeVars ]
+	);
+	const wrapStyle = useMemo(
+		() => ( { width: `${ size }px`, height: `${ size + 20 }px` } ),
+		[ size ]
+	);
+	const svgStyle = useMemo(
+		() => ( {
+			width: `${ size }px`,
+			height: `${ size + 20 }px`,
+			overflow: 'visible',
+		} ),
+		[ size ]
+	);
 
 	return (
 		<div
 			className={ `dewey-character ${ className }` }
-			style={ { '--dewey-scale': scale } }
+			style={ characterStyle }
 		>
 			{ showSpeech && (
 				<div className="dewey-speech-bubble">{ currentSpeech }</div>
@@ -187,7 +425,7 @@ export default function Dewey( {
 
 			<div
 				className={ `dewey-wrap dewey-state-${ safeState }` }
-				style={ { width: `${ size }px`, height: `${ size + 20 }px` } }
+				style={ wrapStyle }
 			>
 				<div className="dewey-particles">
 					{ particles.map( ( particle ) => (
@@ -202,11 +440,7 @@ export default function Dewey( {
 				<svg
 					viewBox="0 0 170 190"
 					xmlns="http://www.w3.org/2000/svg"
-					style={ {
-						width: `${ size }px`,
-						height: `${ size + 20 }px`,
-						overflow: 'visible',
-					} }
+					style={ svgStyle }
 					aria-label="Dewey, your archive research assistant"
 					role="img"
 				>
@@ -250,7 +484,7 @@ export default function Dewey( {
 							width="20"
 							height="14"
 							rx="4.5"
-							fill="#1b4332"
+							fill={ DEWEY_BASE_900 }
 						/>
 						<rect
 							x="95"
@@ -258,21 +492,21 @@ export default function Dewey( {
 							width="20"
 							height="14"
 							rx="4.5"
-							fill="#1b4332"
+							fill={ DEWEY_BASE_900 }
 						/>
 						<ellipse
 							cx="65"
 							cy="166"
 							rx="13"
 							ry="6.5"
-							fill="#243d30"
+							fill={ DEWEY_BASE_850 }
 						/>
 						<ellipse
 							cx="105"
 							cy="166"
 							rx="13"
 							ry="6.5"
-							fill="#243d30"
+							fill={ DEWEY_BASE_850 }
 						/>
 						<rect
 							x="59"
@@ -280,7 +514,7 @@ export default function Dewey( {
 							width="11"
 							height="5.5"
 							rx="2"
-							fill="#b5885a"
+							fill={ THEME_ACCENT }
 						/>
 						<rect
 							x="99"
@@ -288,7 +522,7 @@ export default function Dewey( {
 							width="11"
 							height="5.5"
 							rx="2"
-							fill="#b5885a"
+							fill={ THEME_ACCENT }
 						/>
 						<rect
 							x="62"
@@ -296,7 +530,7 @@ export default function Dewey( {
 							width="5"
 							height="2.5"
 							rx="1"
-							fill="#7a5535"
+							fill={ DEWEY_BASE_700 }
 						/>
 						<rect
 							x="102"
@@ -304,52 +538,62 @@ export default function Dewey( {
 							width="5"
 							height="2.5"
 							rx="1"
-							fill="#7a5535"
+							fill={ DEWEY_BASE_700 }
 						/>
 						<path
 							d="M46 100 Q28 107 25 125"
-							stroke="#1b4332"
+							stroke={ DEWEY_BASE_900 }
 							strokeWidth="10"
 							fill="none"
 							strokeLinecap="round"
 						/>
 						<path
 							d="M46 100 Q28 107 25 125"
-							stroke="#2d6a4f"
+							stroke={ DEWEY_BASE_700 }
 							strokeWidth="7"
 							fill="none"
 							strokeLinecap="round"
 						/>
-						<circle cx="25" cy="127" r="8.5" fill="#2d6a4f" />
+						<circle
+							cx="25"
+							cy="127"
+							r="8.5"
+							fill={ DEWEY_BASE_700 }
+						/>
 						<circle
 							cx="25"
 							cy="127"
 							r="8.5"
 							fill="none"
-							stroke="#1b4332"
+							stroke={ DEWEY_BASE_900 }
 							strokeWidth="1.5"
 						/>
 						<path
 							d="M124 100 Q142 107 145 125"
-							stroke="#1b4332"
+							stroke={ DEWEY_BASE_900 }
 							strokeWidth="10"
 							fill="none"
 							strokeLinecap="round"
 						/>
 						<path
 							d="M124 100 Q142 107 145 125"
-							stroke="#2d6a4f"
+							stroke={ DEWEY_BASE_700 }
 							strokeWidth="7"
 							fill="none"
 							strokeLinecap="round"
 						/>
-						<circle cx="145" cy="127" r="8.5" fill="#2d6a4f" />
+						<circle
+							cx="145"
+							cy="127"
+							r="8.5"
+							fill={ DEWEY_BASE_700 }
+						/>
 						<circle
 							cx="145"
 							cy="127"
 							r="8.5"
 							fill="none"
-							stroke="#1b4332"
+							stroke={ DEWEY_BASE_900 }
 							strokeWidth="1.5"
 						/>
 						<rect
@@ -358,7 +602,7 @@ export default function Dewey( {
 							width="17"
 							height="114"
 							rx="5"
-							fill="#1b4332"
+							fill={ DEWEY_BASE_900 }
 						/>
 						<rect
 							x="41"
@@ -366,7 +610,7 @@ export default function Dewey( {
 							width="11"
 							height="2.5"
 							rx="1"
-							fill="#b5885a"
+							fill={ THEME_ACCENT }
 							opacity="0.65"
 						/>
 						<rect
@@ -375,7 +619,7 @@ export default function Dewey( {
 							width="11"
 							height="1"
 							rx="0.5"
-							fill="#b5885a"
+							fill={ THEME_ACCENT }
 							opacity="0.4"
 						/>
 						<rect
@@ -384,7 +628,7 @@ export default function Dewey( {
 							width="11"
 							height="2.5"
 							rx="1"
-							fill="#b5885a"
+							fill={ THEME_ACCENT }
 							opacity="0.65"
 						/>
 						<rect
@@ -393,7 +637,7 @@ export default function Dewey( {
 							width="11"
 							height="1"
 							rx="0.5"
-							fill="#b5885a"
+							fill={ THEME_ACCENT }
 							opacity="0.4"
 						/>
 						<text
@@ -402,7 +646,7 @@ export default function Dewey( {
 							textAnchor="middle"
 							fontFamily="Georgia,serif"
 							fontSize="7"
-							fill="#b5885a"
+							fill={ THEME_ACCENT }
 							opacity="0.8"
 						>
 							D
@@ -413,7 +657,7 @@ export default function Dewey( {
 							width="82"
 							height="118"
 							rx="7"
-							fill="#2d6a4f"
+							fill={ DEWEY_BASE_700 }
 						/>
 						<rect
 							x="50"
@@ -430,7 +674,7 @@ export default function Dewey( {
 							height="108"
 							rx="5"
 							fill="none"
-							stroke="#b5885a"
+							stroke={ THEME_ACCENT }
 							strokeWidth="1.6"
 							opacity="0.55"
 						/>
@@ -441,7 +685,7 @@ export default function Dewey( {
 							height="100"
 							rx="4"
 							fill="none"
-							stroke="#b5885a"
+							stroke={ THEME_ACCENT }
 							strokeWidth="0.8"
 							opacity="0.35"
 						/>
@@ -467,7 +711,7 @@ export default function Dewey( {
 							width="36"
 							height="80"
 							rx="2"
-							fill="#fdf6e3"
+							fill={ DEWEY_PAPER_100 }
 						/>
 						<rect
 							x="55"
@@ -476,19 +720,17 @@ export default function Dewey( {
 							height="80"
 							fill="rgba(0,0,0,0.05)"
 						/>
-						{ [ 75, 83, 91, 99, 107, 115, 123, 131 ].map(
-							( y, i ) => (
-								<line
-									key={ i }
-									x1="62"
-									y1={ y }
-									x2={ i % 3 === 2 ? 80 : 87 }
-									y2={ y }
-									stroke="#c4b898"
-									strokeWidth="1"
-								/>
-							)
-						) }
+						{ PAGE_LINE_YS.map( ( y, i ) => (
+							<line
+								key={ i }
+								x1="62"
+								y1={ y }
+								x2={ i % 3 === 2 ? 80 : 87 }
+								y2={ y }
+								stroke={ DEWEY_PAPER_LINE }
+								strokeWidth="1"
+							/>
+						) ) }
 						<g className="dewey-page-right">
 							<rect
 								x="91"
@@ -496,7 +738,7 @@ export default function Dewey( {
 								width="36"
 								height="80"
 								rx="2"
-								fill="#f5edd6"
+								fill={ DEWEY_PAPER_200 }
 							/>
 							<rect
 								x="122"
@@ -505,26 +747,24 @@ export default function Dewey( {
 								height="80"
 								fill="rgba(0,0,0,0.04)"
 							/>
-							{ [ 75, 83, 91, 99, 107, 115, 123, 131 ].map(
-								( y, i ) => (
-									<line
-										key={ i }
-										x1="95"
-										y1={ y }
-										x2={ i % 3 === 2 ? 114 : 122 }
-										y2={ y }
-										stroke="#c4b898"
-										strokeWidth="1"
-									/>
-								)
-							) }
+							{ PAGE_LINE_YS.map( ( y, i ) => (
+								<line
+									key={ i }
+									x1="95"
+									y1={ y }
+									x2={ i % 3 === 2 ? 114 : 122 }
+									y2={ y }
+									stroke={ DEWEY_PAPER_LINE }
+									strokeWidth="1"
+								/>
+							) ) }
 						</g>
 						<line
 							x1="91"
 							y1="62"
 							x2="91"
 							y2="142"
-							stroke="#b0a07a"
+							stroke={ DEWEY_PAPER_SPINE }
 							strokeWidth="1.5"
 							opacity="0.6"
 						/>
@@ -534,7 +774,7 @@ export default function Dewey( {
 							width="66"
 							height="56"
 							rx="13"
-							fill="#3d8a6a"
+							fill={ DEWEY_BASE_600 }
 						/>
 						<rect
 							x="58"
@@ -549,28 +789,28 @@ export default function Dewey( {
 							cy="87"
 							rx="10"
 							ry="7.5"
-							fill="rgba(205,110,80,0.26)"
+							fill={ DEWEY_BLUSH }
 						/>
 						<ellipse
 							cx="104"
 							cy="87"
 							rx="10"
 							ry="7.5"
-							fill="rgba(205,110,80,0.26)"
+							fill={ DEWEY_BLUSH }
 						/>
 						<ellipse
 							cx="74"
 							cy="71"
 							rx="14"
 							ry="14"
-							fill="#fdf6e3"
+							fill={ DEWEY_PAPER_100 }
 						/>
 						<ellipse
 							cx="96"
 							cy="71"
 							rx="14"
 							ry="14"
-							fill="#fdf6e3"
+							fill={ DEWEY_PAPER_100 }
 						/>
 						<g
 							className="dewey-eye-l"
@@ -584,9 +824,14 @@ export default function Dewey( {
 									cx="74"
 									cy="71"
 									r="7.5"
-									fill="#0d2015"
+									fill={ DEWEY_PUPIL_DARK }
 								/>
-								<circle cx="74" cy="71" r="5" fill="#1e4a2a" />
+								<circle
+									cx="74"
+									cy="71"
+									r="5"
+									fill={ DEWEY_PUPIL_LIGHT }
+								/>
 								<circle cx="77" cy="68" r="2.8" fill="white" />
 								<circle
 									cx="78"
@@ -600,7 +845,7 @@ export default function Dewey( {
 								cy="59"
 								rx="14"
 								ry="3.5"
-								fill="#3d8a6a"
+								fill={ DEWEY_BASE_600 }
 							/>
 						</g>
 						<g
@@ -615,9 +860,14 @@ export default function Dewey( {
 									cx="96"
 									cy="71"
 									r="7.5"
-									fill="#0d2015"
+									fill={ DEWEY_PUPIL_DARK }
 								/>
-								<circle cx="96" cy="71" r="5" fill="#1e4a2a" />
+								<circle
+									cx="96"
+									cy="71"
+									r="5"
+									fill={ DEWEY_PUPIL_LIGHT }
+								/>
 								<circle cx="99" cy="68" r="2.8" fill="white" />
 								<circle
 									cx="100"
@@ -631,7 +881,7 @@ export default function Dewey( {
 								cy="59"
 								rx="14"
 								ry="3.5"
-								fill="#3d8a6a"
+								fill={ DEWEY_BASE_600 }
 							/>
 						</g>
 						<ellipse
@@ -640,7 +890,7 @@ export default function Dewey( {
 							rx="14"
 							ry="14"
 							fill="none"
-							stroke="#b5885a"
+							stroke={ THEME_ACCENT }
 							strokeWidth="2.2"
 						/>
 						<ellipse
@@ -649,12 +899,12 @@ export default function Dewey( {
 							rx="14"
 							ry="14"
 							fill="none"
-							stroke="#b5885a"
+							stroke={ THEME_ACCENT }
 							strokeWidth="2.2"
 						/>
 						<path
 							d="M65 90 Q85 101 105 90"
-							stroke="#1b4332"
+							stroke={ DEWEY_BASE_900 }
 							strokeWidth="2.8"
 							fill="none"
 							strokeLinecap="round"
@@ -662,7 +912,7 @@ export default function Dewey( {
 						/>
 						<path
 							d="M65 97 Q85 87 105 97"
-							stroke="#1b4332"
+							stroke={ DEWEY_BASE_900 }
 							strokeWidth="2.8"
 							fill="none"
 							strokeLinecap="round"
@@ -673,19 +923,19 @@ export default function Dewey( {
 							cy="93"
 							rx="8"
 							ry="6.5"
-							fill="#1b4332"
+							fill={ DEWEY_BASE_900 }
 							opacity={ config.mouth === 'shocked' ? 1 : 0 }
 						/>
 						<path
 							d={ browPaths[ 0 ] }
-							stroke="#b5885a"
+							stroke={ THEME_ACCENT }
 							strokeWidth="2.8"
 							fill="none"
 							strokeLinecap="round"
 						/>
 						<path
 							d={ browPaths[ 1 ] }
-							stroke="#b5885a"
+							stroke={ THEME_ACCENT }
 							strokeWidth="2.8"
 							fill="none"
 							strokeLinecap="round"
@@ -697,7 +947,7 @@ export default function Dewey( {
 							height="17"
 							rx="6"
 							fill="none"
-							stroke="#b5885a"
+							stroke={ THEME_ACCENT }
 							strokeWidth="1.6"
 							opacity="0.88"
 						/>
@@ -708,7 +958,7 @@ export default function Dewey( {
 							height="17"
 							rx="6"
 							fill="none"
-							stroke="#b5885a"
+							stroke={ THEME_ACCENT }
 							strokeWidth="1.6"
 							opacity="0.88"
 						/>
@@ -717,7 +967,7 @@ export default function Dewey( {
 							y1="71.5"
 							x2="85"
 							y2="71.5"
-							stroke="#b5885a"
+							stroke={ THEME_ACCENT }
 							strokeWidth="1.6"
 							opacity="0.88"
 						/>
@@ -726,7 +976,7 @@ export default function Dewey( {
 							y1="71.5"
 							x2="55"
 							y2="69"
-							stroke="#b5885a"
+							stroke={ THEME_ACCENT }
 							strokeWidth="1.6"
 							opacity="0.88"
 						/>
@@ -735,7 +985,7 @@ export default function Dewey( {
 							y1="71.5"
 							x2="111"
 							y2="69"
-							stroke="#b5885a"
+							stroke={ THEME_ACCENT }
 							strokeWidth="1.6"
 							opacity="0.88"
 						/>
@@ -744,16 +994,19 @@ export default function Dewey( {
 							y="42"
 							width="10"
 							height="36"
-							fill="#8b1e2e"
+							fill={ THEME_ACCENT_DARK }
 						/>
-						<polygon points="117,78 127,78 122,88" fill="#8b1e2e" />
+						<polygon
+							points="117,78 127,78 122,88"
+							fill={ THEME_ACCENT_DARK }
+						/>
 						<rect
 							x="117"
 							y="42"
 							width="10"
 							height="5.5"
 							rx="1.5"
-							fill="#b5885a"
+							fill={ THEME_ACCENT }
 						/>
 						<text
 							x="85"
@@ -762,7 +1015,7 @@ export default function Dewey( {
 							fontFamily="Georgia,serif"
 							fontSize="8"
 							fontWeight="900"
-							fill="#b5885a"
+							fill={ THEME_ACCENT }
 							letterSpacing="1.8"
 							opacity="0.95"
 						>
@@ -774,7 +1027,7 @@ export default function Dewey( {
 							textAnchor="middle"
 							fontFamily="Georgia,serif"
 							fontSize="6"
-							fill="#b5885a"
+							fill={ THEME_ACCENT }
 							letterSpacing="0.8"
 							opacity="0.65"
 						>
@@ -785,7 +1038,7 @@ export default function Dewey( {
 							y1="126"
 							x2="100"
 							y2="126"
-							stroke="#b5885a"
+							stroke={ THEME_ACCENT }
 							strokeWidth="0.8"
 							opacity="0.5"
 						/>
@@ -793,19 +1046,19 @@ export default function Dewey( {
 							cx="85"
 							cy="126"
 							r="1.8"
-							fill="#b5885a"
+							fill={ THEME_ACCENT }
 							opacity="0.5"
 						/>
 						<path
 							d="M57 144 L57 152 L65 152"
-							stroke="#b5885a"
+							stroke={ THEME_ACCENT }
 							strokeWidth="1.2"
 							fill="none"
 							opacity="0.4"
 						/>
 						<path
 							d="M127 144 L127 152 L119 152"
-							stroke="#b5885a"
+							stroke={ THEME_ACCENT }
 							strokeWidth="1.2"
 							fill="none"
 							opacity="0.4"
@@ -816,3 +1069,5 @@ export default function Dewey( {
 		</div>
 	);
 }
+
+export default memo( Dewey );

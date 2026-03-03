@@ -1,22 +1,28 @@
 === Dewey ===
 Contributors: regionallyfamous
-Tags: ai, admin, search, content, assistant
+Tags: ai, content search, admin assistant, writing assistant, knowledge base
 Requires at least: 7.0
 Tested up to: 7.0
-Requires PHP: 7.4
-Stable tag: 1.0.6
+Requires PHP: 8.1
+Stable tag: 1.0.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Turn years of posts into instant, source-backed answers right inside WP Admin.
+Your best content is already written. Dewey helps your team rediscover it fast and turn archive knowledge into confident publishing decisions.
 
 == Description ==
 
-Dewey is your on-site archive assistant for WordPress.
+Dewey turns your WordPress archive into an active writing partner.
 
-Ask a question, get a concise answer, and jump directly to source posts that support it.
+When teams move fast, memory breaks: strong ideas get buried, duplicate posts appear, and voice drifts.
 
-Built for teams that want grounded answers from their own content archive without leaving wp-admin.
+Dewey gives editors a better workflow:
+
+* Ask plain-English questions in wp-admin.
+* Pull relevant context from what you have already published.
+* Respond with source-backed guidance so decisions are grounded, not guessed.
+
+The result is faster publishing, stronger consistency, and less reinvention.
 
 == Installation ==
 
@@ -37,16 +43,31 @@ Dewey endpoints are permission-gated and intended for authenticated WordPress us
 
 == Changelog ==
 
+= 1.0.9 =
+* Release readiness refresh: dependency updates, final QA pass, and packaging/tooling verification for current build pipeline.
+* Improved admin-theme visual parity in Dewey chat and character polish from the latest UX/accessibility refinements.
+* Developer modernization updates retained: PHP 8.1 baseline with stricter typed internals for settings and intent routing.
+
+= 1.0.8 =
+* PHP modernization release: migrated core settings/router internals to strict typing patterns and immutable rule/default maps for faster, safer runtime behavior.
+* Raised minimum supported PHP version to 8.1 for modern language features and cleaner contracts.
+* Internal performance pass: settings reads now use in-request caching to avoid repeated option normalization overhead.
+
+= 1.0.7 =
+* Design system alignment release: Dewey chat now uses WordPress component foundations and WP admin visual patterns.
+* Theme-aware visual refresh: Dewey character and chat accents now inherit the active admin color scheme with improved dark-scheme readability.
+* Accessibility and UX polish: enhanced keyboard/focus behavior, reduced-motion handling, and refined micro-interactions across the chat surface.
+
 = 1.0.6 =
 * Compatibility hotfix: avoid direct core AI-client helper calls that can trigger upstream PHP signature fatals in some WordPress environments.
 
-= 1.0.6 =
+= 1.0.5 =
 * UI update: enlarged Dewey icon launcher, removed circle button chrome, and refreshed panel styling/positioning.
 
-= 1.0.6 =
+= 1.0.4 =
 * UI refinement release: enlarged Dewey launcher and made the character icon-only (removed panel/header instances).
 
-= 1.0.6 =
+= 1.0.3 =
 * UI polish release: restored the original Dewey character and used it for both launcher and panel header icons.
 
 = 1.0.2 =

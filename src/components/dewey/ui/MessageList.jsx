@@ -2,13 +2,28 @@
  * MessageList.jsx
  */
 
-export default function MessageList( {
-	messages,
-	hasAskedStarter,
-	onStarterSelect,
-} ) {
+import { memo, useEffect, useRef } from '@wordpress/element';
+import { Button } from '@wordpress/components';
+
+function MessageList( { messages, hasAskedStarter, onStarterSelect } ) {
+	const listRef = useRef( null );
+
+	useEffect( () => {
+		if ( ! listRef.current ) {
+			return;
+		}
+
+		listRef.current.scrollTop = listRef.current.scrollHeight;
+	}, [ messages ] );
+
 	return (
-		<div className="dewey-panel__messages" role="log" aria-live="polite">
+		<div
+			ref={ listRef }
+			className="dewey-panel__messages"
+			role="log"
+			aria-live="polite"
+			aria-relevant="additions text"
+		>
 			{ messages.map( ( message ) => (
 				<div
 					key={ message.id }
@@ -20,16 +35,17 @@ export default function MessageList( {
 							! hasAskedStarter && (
 								<div className="dewey-message__actions">
 									{ message.actions.map( ( action ) => (
-										<button
+										<Button
 											key={ action.id }
-											type="button"
+											variant="secondary"
+											size="small"
 											className="dewey-message__action"
 											onClick={ () =>
 												onStarterSelect( action )
 											}
 										>
 											{ action.label }
-										</button>
+										</Button>
 									) ) }
 								</div>
 							) }
@@ -39,3 +55,5 @@ export default function MessageList( {
 		</div>
 	);
 }
+
+export default memo( MessageList );

@@ -101,4 +101,17 @@ describe( 'App integration', () => {
 		expect( disconnectedHandlers.onQueryStart ).toHaveBeenCalledTimes( 1 );
 		expect( disconnectedHandlers.onNoResults ).toHaveBeenCalledTimes( 1 );
 	} );
+
+	it( 'closes the panel with Escape key', () => {
+		const { container, getByLabelText, queryByLabelText } = render(
+			<App />
+		);
+		const fab = container.querySelector( '.dewey-fab' );
+
+		fireEvent.click( fab );
+		expect( getByLabelText( 'Dewey panel' ) ).not.toBeNull();
+
+		fireEvent.keyDown( window, { key: 'Escape' } );
+		expect( queryByLabelText( 'Dewey panel' ) ).toBeNull();
+	} );
 } );

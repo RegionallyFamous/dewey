@@ -21,6 +21,11 @@ import {
 } from './copy';
 import { useDewey } from './useDewey';
 
+const MAX_INPUT_CHARS = 500;
+const MAX_MESSAGES = 80;
+const SUBMIT_THROTTLE_MS = 800;
+const CONTROL_CHARS_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+
 export function getInitialOpenState() {
 	try {
 		return ! window.localStorage.getItem( STORAGE_KEYS.openedOnce );
@@ -73,13 +78,32 @@ function createWelcomeMessage() {
 	} );
 }
 
+function normalizeUserInput( value ) {
+	if ( typeof value !== 'string' ) {
+		return '';
+	}
+
+	return value.replace( CONTROL_CHARS_RE, '' ).slice( 0, MAX_INPUT_CHARS );
+}
+
+function isValidStarterAction( action ) {
+	if ( ! action || typeof action !== 'object' ) {
+		return false;
+	}
+
+	return STARTER_ACTIONS.some( ( known ) => known.id === action.id );
+}
+
 export function useDeweyChat() {
 	const isFirstOpen = useMemo( () => getInitialOpenState(), [] );
 	const [ isOpen, setIsOpen ] = useState( isFirstOpen );
 	const [ inputValue, setInputValue ] = useState( '' );
-	const [ messages, setMessages ] = useState( [ createWelcomeMessage() ] );
+	const [ messages, setMessages ] = useState( () => [
+		createWelcomeMessage(),
+	] );
 	const [ hasAskedStarter, setHasAskedStarter ] = useState( false );
 	const inputRef = useRef( null );
+	const lastSubmitAtRef = useRef( 0 );
 	const isAiConnected = useMemo( () => detectAiConnection(), [] );
 	const { deweyState, deweyHandlers } = useDewey();
 	const { onFirstOpen } = deweyHandlers;
@@ -103,10 +127,16 @@ export function useDeweyChat() {
 	);
 
 	const addMessage = useCallback( ( role, text, extra = {} ) => {
-		setMessages( ( current ) => [
-			...current,
-			createMessage( role, text, extra ),
-		] );
+		setMessages( ( current ) => {
+			const next = [ ...current, createMessage( role, text, extra ) ];
+			if ( next.length <= MAX_MESSAGES ) {
+				return next;
+			}
+
+			const [ welcomeMessage ] = next;
+			const tail = next.slice( next.length - ( MAX_MESSAGES - 1 ) );
+			return [ welcomeMessage, ...tail ];
+		} );
 	}, [] );
 
 	const openPanel = useCallback( () => {
@@ -130,6 +160,9 @@ export function useDeweyChat() {
 
 	const handleStarter = useCallback(
 		( action ) => {
+			if ( ! isValidStarterAction( action ) ) {
+				return;
+			}
 			setHasAskedStarter( true );
 			addMessage( 'user', action.label );
 			deweyHandlers.onAnswerReady( 1 );
@@ -141,11 +174,16 @@ export function useDeweyChat() {
 	const handleSubmit = useCallback(
 		( event ) => {
 			event.preventDefault();
+			const now = Date.now();
+			if ( now - lastSubmitAtRef.current < SUBMIT_THROTTLE_MS ) {
+				return;
+			}
 
-			const question = inputValue.trim();
+			const question = normalizeUserInput( inputValue ).trim();
 			if ( ! question ) {
 				return;
 			}
+			lastSubmitAtRef.current = now;
 
 			setInputValue( '' );
 			addMessage( 'user', question );
@@ -173,7 +211,8 @@ export function useDeweyChat() {
 		deweyState,
 		speech,
 		inputRef,
-		setInputValue,
+		setInputValue: ( nextValue ) =>
+			setInputValue( normalizeUserInput( nextValue ) ),
 		openPanel,
 		closePanel,
 		togglePanel,

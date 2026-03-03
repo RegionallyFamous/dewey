@@ -178,6 +178,8 @@ function run(cmd, args, options = {}) {
 }
 
 function copyRecursive(src, dest) {
+	assertPathWithin(ROOT, src);
+	assertPathWithin(stagedPluginRoot, dest);
 	const stat = fs.lstatSync(src);
 	if (stat.isSymbolicLink()) {
 		throw new Error(`Refusing to package symlink: ${src}`);
@@ -188,6 +190,9 @@ function copyRecursive(src, dest) {
 			copyRecursive(path.join(src, entry), path.join(dest, entry));
 		}
 		return;
+	}
+	if (!stat.isFile()) {
+		throw new Error(`Refusing to package non-regular file: ${src}`);
 	}
 	fs.mkdirSync(path.dirname(dest), { recursive: true });
 	fs.copyFileSync(src, dest);

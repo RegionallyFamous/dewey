@@ -1,6 +1,6 @@
 {
   "name": "dewey",
-  "version": "1.0.6",
+  "version": "1.0.9",
   "private": true,
   "description": "Dewey WordPress plugin admin UI and release tooling.",
   "scripts": {
@@ -18,10 +18,10 @@
     "release:dry-run": "node ./scripts/release-plugin.js --dry-run"
   },
   "dependencies": {
+    "@wordpress/components": "^32.2.0",
     "@wordpress/element": "^6.0.0"
   },
   "devDependencies": {
-    "@stylistic/stylelint-plugin": "^3.1.3",
     "@testing-library/react": "^16.3.0",
     "@wordpress/scripts": "^31.5.0"
   }

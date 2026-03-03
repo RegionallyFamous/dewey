@@ -85,4 +85,74 @@ describe( 'useDeweyChat', () => {
 		expect( lastMessage.role ).toBe( 'assistant' );
 		expect( lastMessage.text ).toBe( NO_AI_MESSAGE );
 	} );
+
+	it( 'sanitizes user input before submit', () => {
+		window.deweyConfig = { aiConnected: false };
+		const { result } = renderHook( () => useDeweyChat() );
+		const oversized = `hello\u0001\u0007${ 'x'.repeat( 700 ) }`;
+
+		act( () => {
+			result.current.setInputValue( oversized );
+		} );
+
+		expect( result.current.inputValue.includes( '\u0001' ) ).toBe( false );
+		expect( result.current.inputValue.includes( '\u0007' ) ).toBe( false );
+		expect( result.current.inputValue.length ).toBe( 500 );
+
+		act( () => {
+			result.current.handleSubmit( { preventDefault: jest.fn() } );
+		} );
+
+		const userMessage = result.current.messages.find(
+			( message ) => message.role === 'user'
+		);
+		expect( userMessage ).toBeDefined();
+		expect( userMessage.text.length ).toBe( 500 );
+		expect( userMessage.text.includes( '\u0001' ) ).toBe( false );
+		expect( userMessage.text.includes( '\u0007' ) ).toBe( false );
+	} );
+
+	it( 'throttles rapid submits to reduce abuse/flooding', () => {
+		window.deweyConfig = { aiConnected: false };
+		const nowSpy = jest.spyOn( Date, 'now' );
+		nowSpy.mockReturnValue( 1000 );
+		const { result } = renderHook( () => useDeweyChat() );
+
+		act( () => {
+			result.current.setInputValue( 'First question' );
+			result.current.handleSubmit( { preventDefault: jest.fn() } );
+		} );
+
+		act( () => {
+			result.current.setInputValue( 'Second question too fast' );
+			nowSpy.mockReturnValue( 1500 );
+			result.current.handleSubmit( { preventDefault: jest.fn() } );
+		} );
+
+		const userMessages = result.current.messages.filter(
+			( message ) => message.role === 'user'
+		);
+		expect( userMessages ).toHaveLength( 1 );
+		expect( handlers.onQueryStart ).toHaveBeenCalledTimes( 1 );
+		nowSpy.mockRestore();
+	} );
+
+	it( 'caps chat history length while preserving welcome message', () => {
+		window.deweyConfig = { aiConnected: false };
+		const nowSpy = jest.spyOn( Date, 'now' );
+		nowSpy.mockImplementation( () => 5000 );
+		const { result } = renderHook( () => useDeweyChat() );
+
+		for ( let i = 0; i < 45; i++ ) {
+			act( () => {
+				result.current.setInputValue( `Question ${ i }` );
+				nowSpy.mockReturnValue( 5000 + i * 1000 );
+				result.current.handleSubmit( { preventDefault: jest.fn() } );
+			} );
+		}
+
+		expect( result.current.messages[ 0 ].id ).toBe( 'welcome' );
+		expect( result.current.messages.length ).toBeLessThanOrEqual( 80 );
+		nowSpy.mockRestore();
+	} );
 } );

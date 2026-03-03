@@ -1,10 +1,20 @@
 # Dewey for WordPress
 
-Turn years of posts into instant answers in WP Admin with a conversational UI.
+Dewey helps your team rediscover what your site already knows, so your best ideas stop getting buried in old posts.
 
 Built by [Regionally Famous](https://regionallyfamous.com).
 
-## Current Scope (v1.0.6)
+## Why Dewey Matters
+
+Most teams are not short on ideas. They are short on recall.
+
+When deadlines hit, valuable insights disappear into old posts, duplicated work sneaks in, and messaging drifts. Dewey closes that gap by turning your archive into an active editorial asset:
+
+- Find prior thinking before you rewrite it from scratch.
+- Ground decisions in source-backed context from your own site.
+- Publish faster while keeping voice and positioning consistent.
+
+## Current Scope (v1.0.9)
 
 This repository currently ships:
 
@@ -18,7 +28,7 @@ This repository does **not** currently ship live archive retrieval or REST route
 ## Requirements
 
 - WordPress `7.0+`
-- PHP `7.4+`
+- PHP `8.1+`
 
 ## Installation
 
@@ -59,10 +69,10 @@ npm run check
 
 ```bash
 # Full preflight checks + build + packaging
-npm run release -- 1.0.6
+npm run release -- 1.0.9
 
 # Dry run (no zip write, no build)
-npm run release:dry-run -- 1.0.6 --skip-build
+npm run release:dry-run -- 1.0.9 --skip-build
 ```
 
 Release archives are generated in `releases/` as `dewey-<version>.zip`.

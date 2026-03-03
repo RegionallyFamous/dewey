@@ -2,9 +2,11 @@
  * DeweyPanel.jsx
  */
 
+import { memo, useEffect, useMemo } from '@wordpress/element';
+import { Button, TextControl } from '@wordpress/components';
 import MessageList from './MessageList';
 
-export default function DeweyPanel( {
+function DeweyPanel( {
 	messages,
 	hasAskedStarter,
 	onStarterSelect,
@@ -14,24 +16,42 @@ export default function DeweyPanel( {
 	inputValue,
 	onInputChange,
 } ) {
+	const isSubmitDisabled = useMemo(
+		() => ! inputValue.trim(),
+		[ inputValue ]
+	);
+	const titleId = 'dewey-panel-title';
+
+	useEffect( () => {
+		const onKeyDown = ( event ) => {
+			if ( event.key === 'Escape' ) {
+				onClose();
+			}
+		};
+		window.addEventListener( 'keydown', onKeyDown );
+		return () => window.removeEventListener( 'keydown', onKeyDown );
+	}, [ onClose ] );
+
 	return (
 		<section
 			id="dewey-panel"
 			className="dewey-panel"
+			role="dialog"
+			aria-modal="false"
+			aria-labelledby={ titleId }
 			aria-label="Dewey panel"
 		>
 			<header className="dewey-panel__header">
-				<div className="dewey-panel__title">
+				<div id={ titleId } className="dewey-panel__title">
 					<span>Dewey</span>
 				</div>
-				<button
-					type="button"
+				<Button
+					variant="tertiary"
 					className="dewey-panel__close"
-					aria-label="Close Dewey panel"
+					icon="no-alt"
+					label="Close Dewey panel"
 					onClick={ onClose }
-				>
-					×
-				</button>
+				/>
 			</header>
 
 			<MessageList
@@ -41,24 +61,32 @@ export default function DeweyPanel( {
 			/>
 
 			<form className="dewey-panel__form" onSubmit={ onSubmit }>
-				<input
+				<TextControl
 					ref={ inputRef }
-					type="text"
-					className="dewey-panel__input"
+					className="dewey-panel__input-control"
+					label="Ask Dewey"
+					hideLabelFromVision
 					value={ inputValue }
-					onChange={ ( event ) =>
-						onInputChange( event.target.value )
-					}
+					onChange={ onInputChange }
 					placeholder="Ask Dewey..."
+					maxLength={ 500 }
+					autoComplete="off"
+					spellCheck={ false }
+					__next40pxDefaultSize
+					__nextHasNoMarginBottom
 				/>
-				<button
+				<Button
 					type="submit"
 					className="dewey-panel__submit"
-					aria-label="Send message"
-				>
-					➤
-				</button>
+					variant="primary"
+					icon="arrow-up-alt2"
+					label="Send message"
+					showTooltip={ false }
+					disabled={ isSubmitDisabled }
+				/>
 			</form>
 		</section>
 	);
 }
+
+export default memo( DeweyPanel );

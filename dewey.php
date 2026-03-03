@@ -1,11 +1,11 @@
 <?php
 /**
- * Plugin Name: Dewey
+ * Plugin Name: Dewey AI Search Assistant
  * Plugin URI: https://github.com/regionally-famous/dewey
- * Description: Turn years of posts into instant, source-backed answers inside WP Admin.
- * Version: 1.0.6
+ * Description: Your best content is already written. Dewey helps your team rediscover it instantly in wp-admin, so every post is faster, sharper, and source-backed.
+ * Version: 1.0.9
  * Requires at least: 7.0
- * Requires PHP: 7.4
+ * Requires PHP: 8.1
  * Author: Regionally Famous
  * Author URI: https://regionallyfamous.com
  * License: GPL-2.0-or-later
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'DEWEY_VERSION', '1.0.6' );
+define( 'DEWEY_VERSION', '1.0.9' );
 define( 'DEWEY_PLUGIN_FILE', __FILE__ );
 define( 'DEWEY_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DEWEY_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -39,6 +39,7 @@ function dewey_register_assets() {
 			'dependencies' => array( 'wp-element' ),
 			'version'      => DEWEY_VERSION,
 		);
+	$asset      = dewey_normalize_asset_meta( $asset );
 
 	wp_register_script(
 		'dewey-admin',
@@ -51,11 +52,62 @@ function dewey_register_assets() {
 	wp_register_style(
 		'dewey-admin',
 		DEWEY_PLUGIN_URL . 'build/index.css',
-		array(),
+		array( 'wp-components' ),
 		$asset['version']
 	);
 }
 add_action( 'admin_init', 'dewey_register_assets' );
+
+/**
+ * Normalize asset metadata loaded from build/index.asset.php.
+ *
+ * @param mixed $asset Asset metadata payload.
+ * @return array
+ */
+function dewey_normalize_asset_meta( $asset ) {
+	$defaults = array(
+		'dependencies' => array( 'wp-element' ),
+		'version'      => DEWEY_VERSION,
+	);
+
+	if ( ! is_array( $asset ) ) {
+		return $defaults;
+	}
+
+	$deps = $asset['dependencies'] ?? $defaults['dependencies'];
+	if ( ! is_array( $deps ) ) {
+		$deps = $defaults['dependencies'];
+	}
+
+	$deps = array_values(
+		array_filter(
+			array_map(
+				static function ( $value ) {
+					if ( ! is_scalar( $value ) ) {
+						return '';
+					}
+
+					return sanitize_key( (string) $value );
+				},
+				$deps
+			)
+		)
+	);
+
+	if ( empty( $deps ) ) {
+		$deps = $defaults['dependencies'];
+	}
+
+	$version = $asset['version'] ?? $defaults['version'];
+	if ( ! is_scalar( $version ) ) {
+		$version = $defaults['version'];
+	}
+
+	return array(
+		'dependencies' => $deps,
+		'version'      => sanitize_text_field( (string) $version ),
+	);
+}
 
 /**
  * Determine whether Dewey assets should load on the current admin page.
@@ -64,13 +116,40 @@ add_action( 'admin_init', 'dewey_register_assets' );
  * @return bool
  */
 function dewey_should_enqueue_admin_assets( string $hook_suffix ): bool {
-	unset( $hook_suffix );
+	if ( wp_doing_ajax() || wp_doing_cron() ) {
+		return false;
+	}
 
 	if ( ! current_user_can( 'edit_posts' ) ) {
 		return false;
 	}
 
-	return true;
+	$allowed_hooks = apply_filters(
+		'dewey_allowed_admin_hooks',
+		array(
+			'index.php',
+			'edit.php',
+			'post.php',
+			'post-new.php',
+			'upload.php',
+			'edit-tags.php',
+			'term.php',
+			'site-editor.php',
+		)
+	);
+	$allowed_hooks = is_array( $allowed_hooks ) ? $allowed_hooks : array();
+
+	$is_allowed_hook = in_array( $hook_suffix, $allowed_hooks, true );
+	$is_allowed_hook = $is_allowed_hook || 0 === strpos( $hook_suffix, 'toplevel_page_' );
+	$is_allowed_hook = $is_allowed_hook || 0 === strpos( $hook_suffix, 'dewey_page_' );
+	$is_allowed_hook = $is_allowed_hook || 0 === strpos( $hook_suffix, 'settings_page_' );
+	$is_allowed_hook = $is_allowed_hook || 0 === strpos( $hook_suffix, 'tools_page_' );
+
+	if ( ! $is_allowed_hook ) {
+		return false;
+	}
+
+	return (bool) apply_filters( 'dewey_can_enqueue_admin_assets', true );
 }
 
 /**
@@ -83,6 +162,9 @@ function dewey_enqueue_admin_assets( string $hook_suffix ) {
 		return;
 	}
 	if ( ! dewey_should_enqueue_admin_assets( $hook_suffix ) ) {
+		return;
+	}
+	if ( ! wp_script_is( 'dewey-admin', 'registered' ) || ! wp_style_is( 'dewey-admin', 'registered' ) ) {
 		return;
 	}
 

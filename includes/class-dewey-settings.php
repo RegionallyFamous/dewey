@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * Dewey_Settings
  *
@@ -9,31 +10,79 @@
 
 defined( 'ABSPATH' ) || exit;
 
-class Dewey_Settings {
+final class Dewey_Settings {
 
 	const OPTION_KEY = 'dewey_settings';
 
 	/**
+	 * Cached sanitized settings to avoid repeated option reads.
+	 *
+	 * @var array<string,mixed>|null
+	 */
+	private static ?array $cache = null;
+
+	/**
+	 * Default settings.
+	 *
+	 * @var array<string,mixed>
+	 */
+	private const DEFAULTS = array(
+		'retrieval_mode'      => 'core', // core|indexed|auto
+		'cost_mode'           => 'minimize', // minimize|balanced
+		'indexed_post_types'  => array( 'post', 'page' ),
+		'indexed_statuses'    => array( 'publish' ),
+		'assistant_tone'      => 'match', // match|casual|precise
+		'assistant_verbosity' => 'concise', // concise|detailed
+		'citation_style'      => 'titles', // titles|links
+		'search_max_results'  => 5,
+		'search_max_content'  => 1800,
+		'response_max_tokens' => 350,
+	);
+
+	/**
+	 * Allowlist values for enum-like string settings.
+	 *
+	 * @var array<string,array<int,string>>
+	 */
+	private const STRING_ALLOWLISTS = array(
+		'retrieval_mode'      => array( 'core', 'indexed', 'auto' ),
+		'cost_mode'           => array( 'minimize', 'balanced' ),
+		'assistant_tone'      => array( 'match', 'casual', 'precise' ),
+		'assistant_verbosity' => array( 'concise', 'detailed' ),
+		'citation_style'      => array( 'titles', 'links' ),
+	);
+
+	/**
 	 * Get all settings with defaults applied.
 	 *
-	 * @return array
+	 * @return array<string,mixed>
 	 */
 	public static function get_all(): array {
+		if ( null !== self::$cache ) {
+			return self::$cache;
+		}
+
 		$saved = get_option( self::OPTION_KEY, array() );
 		if ( ! is_array( $saved ) ) {
 			$saved = array();
 		}
 
-		return wp_parse_args( self::sanitize_all( $saved ), self::defaults() );
+		$normalized = wp_parse_args(
+			self::sanitize_all( $saved ),
+			self::DEFAULTS
+		);
+
+		self::$cache = $normalized;
+		return $normalized;
 	}
 
 	/**
 	 * Get one setting.
 	 *
 	 * @param string $key
-	 * @return mixed|null
+	 * @return mixed
 	 */
-	public static function get( string $key ) {
+	public static function get( string $key ): mixed {
 		$all = self::get_all();
 		return $all[ $key ] ?? null;
 	}
@@ -50,6 +99,7 @@ class Dewey_Settings {
 		$merged   = array_merge( $current, $sanitized );
 
 		update_option( self::OPTION_KEY, $merged );
+		self::$cache = $merged;
 		return $merged;
 	}
 
@@ -59,18 +109,7 @@ class Dewey_Settings {
 	 * @return array
 	 */
 	public static function defaults(): array {
-		return array(
-			'retrieval_mode'      => 'core', // core|indexed|auto
-			'cost_mode'           => 'minimize', // minimize|balanced
-			'indexed_post_types'  => array( 'post', 'page' ),
-			'indexed_statuses'    => array( 'publish' ),
-			'assistant_tone'      => 'match', // match|casual|precise
-			'assistant_verbosity' => 'concise', // concise|detailed
-			'citation_style'      => 'titles', // titles|links
-			'search_max_results'  => 5,
-			'search_max_content'  => 1800,
-			'response_max_tokens' => 350,
-		);
+		return self::DEFAULTS;
 	}
 
 	/**
@@ -82,16 +121,15 @@ class Dewey_Settings {
 	public static function sanitize_all( array $settings ): array {
 		$clean = array();
 
-		if ( array_key_exists( 'retrieval_mode', $settings ) ) {
-			$allowed                  = array( 'core', 'indexed', 'auto' );
-			$value                    = sanitize_key( (string) $settings['retrieval_mode'] );
-			$clean['retrieval_mode']  = in_array( $value, $allowed, true ) ? $value : self::defaults()['retrieval_mode'];
-		}
-
-		if ( array_key_exists( 'cost_mode', $settings ) ) {
-			$allowed             = array( 'minimize', 'balanced' );
-			$value               = sanitize_key( (string) $settings['cost_mode'] );
-			$clean['cost_mode']  = in_array( $value, $allowed, true ) ? $value : self::defaults()['cost_mode'];
+		foreach ( self::STRING_ALLOWLISTS as $key => $allowed ) {
+			if ( ! array_key_exists( $key, $settings ) ) {
+				continue;
+			}
+			$clean[ $key ] = self::sanitize_allowlisted_string(
+				$settings[ $key ],
+				$allowed,
+				(string) self::DEFAULTS[ $key ]
+			);
 		}
 
 		if ( array_key_exists( 'indexed_post_types', $settings ) ) {
@@ -100,24 +138,6 @@ class Dewey_Settings {
 
 		if ( array_key_exists( 'indexed_statuses', $settings ) ) {
 			$clean['indexed_statuses'] = self::sanitize_statuses( $settings['indexed_statuses'] );
-		}
-
-		if ( array_key_exists( 'assistant_tone', $settings ) ) {
-			$allowed                 = array( 'match', 'casual', 'precise' );
-			$value                   = sanitize_key( (string) $settings['assistant_tone'] );
-			$clean['assistant_tone'] = in_array( $value, $allowed, true ) ? $value : self::defaults()['assistant_tone'];
-		}
-
-		if ( array_key_exists( 'assistant_verbosity', $settings ) ) {
-			$allowed                      = array( 'concise', 'detailed' );
-			$value                        = sanitize_key( (string) $settings['assistant_verbosity'] );
-			$clean['assistant_verbosity'] = in_array( $value, $allowed, true ) ? $value : self::defaults()['assistant_verbosity'];
-		}
-
-		if ( array_key_exists( 'citation_style', $settings ) ) {
-			$allowed                  = array( 'titles', 'links' );
-			$value                    = sanitize_key( (string) $settings['citation_style'] );
-			$clean['citation_style']  = in_array( $value, $allowed, true ) ? $value : self::defaults()['citation_style'];
 		}
 
 		if ( array_key_exists( 'search_max_results', $settings ) ) {
@@ -148,7 +168,7 @@ class Dewey_Settings {
 	public static function search_max_results(): int {
 		$value = (int) self::get( 'search_max_results' );
 		if ( $value <= 0 ) {
-			$value = (int) self::defaults()['search_max_results'];
+			$value = (int) self::DEFAULTS['search_max_results'];
 		}
 
 		if ( self::is_cost_minimized() ) {
@@ -164,7 +184,7 @@ class Dewey_Settings {
 	public static function search_max_content(): int {
 		$value = (int) self::get( 'search_max_content' );
 		if ( $value <= 0 ) {
-			$value = (int) self::defaults()['search_max_content'];
+			$value = (int) self::DEFAULTS['search_max_content'];
 		}
 
 		if ( self::is_cost_minimized() ) {
@@ -180,7 +200,7 @@ class Dewey_Settings {
 	public static function response_max_tokens(): int {
 		$value = (int) self::get( 'response_max_tokens' );
 		if ( $value <= 0 ) {
-			$value = (int) self::defaults()['response_max_tokens'];
+			$value = (int) self::DEFAULTS['response_max_tokens'];
 		}
 
 		if ( self::is_cost_minimized() ) {
@@ -201,7 +221,7 @@ class Dewey_Settings {
 		$allowed = get_post_types( array( 'public' => true ), 'names' );
 		$clean   = array_values( array_intersect( $list, $allowed ) );
 
-		return empty( $clean ) ? self::defaults()['indexed_post_types'] : $clean;
+		return empty( $clean ) ? self::DEFAULTS['indexed_post_types'] : $clean;
 	}
 
 	/**
@@ -218,6 +238,23 @@ class Dewey_Settings {
 		}
 
 		$clean = array_values( array_intersect( $list, $allowed ) );
-		return empty( $clean ) ? self::defaults()['indexed_statuses'] : $clean;
+		return empty( $clean ) ? self::DEFAULTS['indexed_statuses'] : $clean;
+	}
+
+	/**
+	 * Sanitize string settings against a strict allowlist.
+	 *
+	 * @param mixed             $value Raw value.
+	 * @param array<int,string> $allowed Allowed values.
+	 * @param string            $fallback Fallback value.
+	 * @return string
+	 */
+	private static function sanitize_allowlisted_string(
+		mixed $value,
+		array $allowed,
+		string $fallback
+	): string {
+		$normalized = sanitize_key( (string) $value );
+		return in_array( $normalized, $allowed, true ) ? $normalized : $fallback;
 	}
 }
