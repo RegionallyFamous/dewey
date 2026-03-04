@@ -1,0 +1,84 @@
+{
+	"$schema": "https://playground.wordpress.net/blueprint-schema.json",
+	"preferredVersions": {
+		"php": "8.2",
+		"wp": "latest"
+	},
+	"login": true,
+	"landingPage": "/wp-admin/",
+	"steps": [
+		{
+			"step": "setSiteOptions",
+			"options": {
+				"blogname": "Dewey Demo Site",
+				"blogdescription": "A demo site for exploring Dewey, the WordPress AI assistant"
+			}
+		},
+		{
+			"step": "installPlugin",
+			"pluginData": {
+				"resource": "url",
+				"url": "https://github.com/RegionallyFamous/dewey/releases/download/v1.0.18/dewey-1.0.18.zip"
+			},
+			"options": {
+				"activate": true
+			}
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp term create category 'Performance' --description='Speed and optimization tips for WordPress sites' --porcelain"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp term create category 'Security' --description='Keeping your WordPress site safe' --porcelain"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp term create category 'Blocks & Editor' --description='Working with the WordPress block editor' --porcelain"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp term create category 'SEO' --description='Search engine optimization for WordPress' --porcelain"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp post create --post_title='How to Speed Up WordPress Without a CDN' --post_status='publish' --post_category='2' --post_content='Caching is the single biggest win for most sites. Install a caching plugin like WP Super Cache or W3 Total Cache and enable page caching immediately.\n\nAfter caching, focus on image optimization. Unoptimized images are responsible for the majority of page weight on most WordPress sites. Use a plugin like Smush or ShortPixel to compress images automatically on upload.\n\nDatabase optimization matters more than people think. Over time, WordPress accumulates post revisions, transients, and spam comments that bloat the database. A weekly cleanup keeps queries fast.\n\nFinally, limit the number of plugins you run. Every active plugin adds PHP execution time to every request. Audit your plugins quarterly and remove anything you are not actively using.' --post_excerpt='The top four performance wins for WordPress sites that do not use a CDN.' --porcelain"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp post create --post_title='WordPress Security Checklist for 2025' --post_status='publish' --post_category='3' --post_content='Strong passwords and two-factor authentication are table stakes. Every admin account on your site should have a unique, randomly generated password and 2FA enabled.\n\nKeep WordPress core, themes, and plugins updated. The vast majority of WordPress hacks exploit known vulnerabilities in outdated software. Enable automatic background updates for minor releases at minimum.\n\nChange the default admin username. The username admin is targeted by brute-force bots constantly. If you installed WordPress with admin as the username, create a new administrator account and delete the old one.\n\nLimit login attempts. A plugin like Limit Login Attempts Reloaded blocks IPs after a configurable number of failed login attempts.\n\nUse a Web Application Firewall. Wordfence and Sucuri both offer free WAF tiers that stop common attack patterns before they reach WordPress.' --post_excerpt='A practical security checklist every WordPress site owner should review each year.' --porcelain"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp post create --post_title='Getting the Most Out of the Block Editor' --post_status='publish' --post_category='4' --post_content='Reusable blocks (now called Synced Patterns) are the block editor feature most people ignore and most should use. Any block or group of blocks you use repeatedly can be saved as a synced pattern and updated in one place across every post and page.\n\nThe List View panel is essential for complex layouts. Open it with the toolbar button or Shift+Alt+L to see every block on the page in a navigable tree, which makes selecting nested blocks much less frustrating.\n\nBlock patterns ship with every modern WordPress theme and are a fast way to build good-looking layouts without touching CSS. Browse the pattern library in the inserter to see what is available.\n\nKeyboard shortcuts speed up editing significantly. Ctrl+Alt+T (or Cmd+Option+T on Mac) inserts a block before the current one. Ctrl+Shift+D duplicates the selected block.' --post_excerpt='Four block editor features that most WordPress users have not discovered yet.' --porcelain"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp post create --post_title='Internal Linking Strategy for WordPress Sites' --post_status='publish' --post_category='5' --post_content='Internal links distribute page authority through your site and help search engines understand which content is most important. A well-linked site will almost always rank better than one where posts are silos.\n\nEvery post you publish should link to at least two or three other relevant posts on your site. Think about the questions a reader might have after reading your post and link to content that answers them.\n\nUse descriptive anchor text. Instead of click here, use the title or topic of the post you are linking to. Search engines use anchor text as a signal about the destination content.\n\nAudit your internal links regularly. Posts published years ago may not link to newer content that would be valuable for readers. A quarterly review of your most-visited posts to add fresh internal links pays dividends over time.' --post_excerpt='How to build an internal linking strategy that helps both readers and search rankings.' --porcelain"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp post create --post_title='When to Use Custom Post Types' --post_status='publish' --post_category='2' --post_content='Custom post types make sense when your content has a structure that posts and pages cannot represent well. A portfolio, a product catalog, a team directory, or an event calendar are classic examples.\n\nThe decision point is usually metadata. If your content has fields that are meaningfully different from a standard post title and content area — like a price, a date range, a speaker name, or a project URL — a custom post type with custom fields is the right call.\n\nDo not create a custom post type just because your content is in a distinct category. If it has the same structure as a post and just belongs to a different topic, use categories or a custom taxonomy instead.\n\nRegister custom post types in a plugin, not your theme. If you ever change your theme, content registered in the theme becomes inaccessible until the theme is restored.' --post_excerpt='The criteria that should guide the decision to use a custom post type versus categories or pages.' --porcelain"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp post create --post_title='Understanding WordPress User Roles' --post_status='publish' --post_category='2' --post_content='WordPress ships with five built-in roles: Subscriber, Contributor, Author, Editor, and Administrator. Understanding the difference matters for any site with multiple users.\n\nSubscribers can only manage their own profile. They cannot create content. This role is appropriate for members of a gated community or newsletter list.\n\nContributors can write and edit their own posts but cannot publish. Their submissions go to an Editor or Administrator for review. Good for guest contributors you do not fully trust yet.\n\nAuthors can publish and manage their own posts. They cannot edit other users content. A solid role for regular contributors you trust.\n\nEditors can publish and manage all posts, including other users content. They also manage categories, tags, and comments. Suitable for managing editors and content leads.\n\nAdministrators have full access to everything. On a multisite network, a Super Admin has access across all sites. Limit the number of admin accounts to the minimum necessary.' --post_excerpt='A plain-language guide to the five default WordPress user roles and when to assign each one.' --porcelain"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp post create --post_title='WordPress Multisite: Is It Right for You?' --post_status='publish' --post_category='2' --post_content='WordPress Multisite lets you run a network of sites from a single WordPress installation. It is powerful but adds meaningful complexity, and most people do not need it.\n\nMultisite makes sense when you are managing many sites that share a codebase and user base. A university with a site for each department, a franchise network, or an agency managing client sites on a single platform are good use cases.\n\nThe cost is operational complexity. Plugin and theme updates affect every site in the network. A bad update cannot easily be rolled back for just one site. Database queries become more complex. Backups are harder.\n\nFor most use cases — even running two or three related sites — separate WordPress installations are simpler and more resilient. Only choose Multisite when the shared-network benefits genuinely outweigh the overhead.' --post_excerpt='What WordPress Multisite is, what it costs, and when to actually use it.' --porcelain"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp post create --post_title='Five Common WordPress Mistakes and How to Avoid Them' --post_status='publish' --post_category='3' --post_content='Not having a backup strategy is the most dangerous mistake on this list. If your host does not provide automated daily backups with offsite storage, set one up yourself with UpdraftPlus or similar before anything else.\n\nUsing nulled plugins or themes introduces a security risk that is not worth any cost savings. Nulled software often contains backdoors that give attackers persistent access to your server.\n\nIgnoring PHP version matters more than most people realize. PHP 7.x is end-of-life and no longer receives security patches. WordPress recommends PHP 8.1 or higher. Check your PHP version in the WordPress health dashboard.\n\nInstalling too many plugins degrades performance and increases your attack surface. Each plugin is a dependency you need to maintain. Be deliberate about what you install.\n\nNot using SSL in 2025 is baffling but still happens. HTTPS is free with Let Encrypt, required for Google ranking signals, and necessary for user trust. There is no reason to run a WordPress site without it.' --post_excerpt='The five most common and costly WordPress mistakes, and simple ways to avoid each one.' --porcelain"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp post create --post_title='How WordPress Handles Revisions (And How to Control Them)' --post_status='publish' --post_category='Performance' --post_content='WordPress saves a revision every time you save a draft or update a published post. On an active site with many authors, this can accumulate thousands of revision records in the wp_posts table.\n\nRevisions are useful for recovering lost work, but unlimited revisions are an unnecessary database overhead for most sites. You can cap the number of revisions stored per post by adding a constant to wp-config.php: define( AUTOSAVE_INTERVAL, 300 ) reduces autosave frequency, and define( WP_POST_REVISIONS, 5 ) limits stored revisions to five per post.\n\nIf you already have accumulated revisions you want to clean up, the WP-Optimize plugin can remove them in bulk. Alternatively WP-CLI can do it with a single command: wp post delete $(wp post list --post_type revision --format=ids).' --post_excerpt='How WordPress revision storage works and two ways to keep it under control.' --porcelain"
+		},
+		{
+			"step": "wp-cli",
+			"command": "wp rewrite flush"
+		}
+	]
+}

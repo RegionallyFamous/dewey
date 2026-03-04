@@ -169,6 +169,7 @@ try {
 		console.log(`Creating zip archive: ${outputZip}`);
 		run('zip', ['-rqX', outputZip, STAGE_PLUGIN_DIR], { cwd: stagingRoot });
 		console.log(`Release package created: ${outputZip}`);
+		updateBlueprintVersion(versionArg);
 	}
 } catch (err) {
 	releaseFailed = true;
@@ -185,6 +186,26 @@ if (releaseFailed) {
 
 function existsInRoot(relPath) {
 	return fs.existsSync(path.join(ROOT, relPath));
+}
+
+/**
+ * Keep blueprint.json pointing at the freshly-released zip so the
+ * playground URL always loads the latest version automatically.
+ */
+function updateBlueprintVersion(version) {
+	const blueprintPath = path.join(ROOT, 'blueprint.json');
+	if (!fs.existsSync(blueprintPath)) {
+		return;
+	}
+	const raw = fs.readFileSync(blueprintPath, 'utf8');
+	const updated = raw.replace(
+		/releases\/download\/v[\d.]+\/dewey-[\d.]+\.zip/g,
+		`releases/download/v${version}/dewey-${version}.zip`
+	);
+	if (updated !== raw) {
+		fs.writeFileSync(blueprintPath, updated, 'utf8');
+		console.log(`Updated blueprint.json to point at v${version}.`);
+	}
 }
 
 function run(cmd, args, options = {}) {
