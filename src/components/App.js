@@ -5,7 +5,12 @@
  * for UI state, actions, and copy.
  */
 
-import { DeweyFab, DeweyPanel, useDeweyChat } from './dewey';
+import {
+	DeweyFab,
+	DeweyPanel,
+	useDeweyChat,
+	useNavigationCommands,
+} from './dewey';
 
 export default function App() {
 	const {
@@ -27,6 +32,9 @@ export default function App() {
 		handleSubmit,
 	} = useDeweyChat();
 
+	const { suggestions: navSuggestions, navigate: handleNavigate } =
+		useNavigationCommands( isOpen ? inputValue : '' );
+
 	return (
 		<div className="dewey-app">
 			<DeweyFab isOpen={ isOpen } onToggle={ togglePanel } />
@@ -46,6 +54,8 @@ export default function App() {
 					inputRef={ inputRef }
 					inputValue={ inputValue }
 					onInputChange={ setInputValue }
+					navSuggestions={ navSuggestions }
+					onNavigate={ handleNavigate }
 				/>
 			) }
 		</div>

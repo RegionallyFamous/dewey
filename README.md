@@ -19,6 +19,7 @@ Built by [Regionally Famous](https://regionallyfamous.com).
 - A polished floating Dewey assistant in wp-admin with animated character and persistent chat.
 - Conversational AI answers grounded in your archive — with inline citations and source snippet previews.
 - Follow-up question chips after every response so the conversation stays natural.
+- **Navigation command suggestions**: as you type, Dewey surfaces instant go-to chips for any wp-admin screen — posts, media, themes, settings, users, and more. Works even without an AI provider connected.
 - Page-aware context: Dewey detects which wp-admin screen you're on and offers relevant suggestions.
 - Post-aware context: when editing a specific post, Dewey knows the title, status, tags, and categories.
 - Smart return greeting: reopening Dewey within 4 hours references your last topic.

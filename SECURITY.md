@@ -8,7 +8,7 @@ If you discover a vulnerability, report it privately to the maintainer before pu
 
 - Include affected version, attack path, proof of concept, and impact.
 
-## Current Security Controls (v1.0.19)
+## Current Security Controls (v1.0.20)
 
 - Direct access guards in PHP files (`defined( 'ABSPATH' ) || exit;`).
 - Strict settings sanitization/allowlisting in `Dewey_Settings`.
@@ -38,6 +38,7 @@ If you discover a vulnerability, report it privately to the maintainer before pu
 - Static security scanner checks for high-risk frontend patterns:
   - `eval` and `new Function`,
   - direct HTML sink usage (`dangerouslySetInnerHTML`, `innerHTML`, `outerHTML`).
+- Navigation command sidebar scraper validates all scraped URLs against a strict allowlist (`isSafeAdminUrl`) before they enter the Fuse.js index or are used for navigation — prevents open-redirect via rogue plugin menu items.
 
 ## Current Scope Notes
 

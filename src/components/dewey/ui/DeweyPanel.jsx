@@ -32,6 +32,8 @@ function DeweyPanel( {
 	inputRef,
 	inputValue,
 	onInputChange,
+	navSuggestions = [],
+	onNavigate,
 } ) {
 	const connectorsUrl = useMemo( () => resolveConnectorsUrl(), [] );
 	const isSubmitDisabled = useMemo(
@@ -123,6 +125,30 @@ function DeweyPanel( {
 				onStarterSelect={ onStarterSelect }
 				onMessageAction={ onMessageAction }
 			/>
+
+			{ navSuggestions.length > 0 && ! isSubmitting && (
+				<ul className="dewey-panel__nav-suggestions">
+					{ navSuggestions.map( ( cmd ) => (
+						<li key={ cmd.id }>
+							<button
+								type="button"
+								className="dewey-panel__nav-chip"
+								onClick={ () => onNavigate( cmd ) }
+							>
+								<span className="dewey-panel__nav-chip-label">
+									{ cmd.label }
+								</span>
+								<span
+									className="dewey-panel__nav-chip-arrow"
+									aria-hidden="true"
+								>
+									→
+								</span>
+							</button>
+						</li>
+					) ) }
+				</ul>
+			) }
 
 			<form className="dewey-panel__form" onSubmit={ onSubmit }>
 				<TextControl

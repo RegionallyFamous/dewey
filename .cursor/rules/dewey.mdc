@@ -1,0 +1,128 @@
+---
+description: Dewey WordPress plugin — coding conventions, architecture constraints, and release workflow
+globs: ["**/*.php", "**/*.js", "**/*.jsx", "**/*.css", "**/*.md"]
+alwaysApply: true
+---
+
+# Dewey — Project Rules
+
+## What this project is
+
+Dewey is a WordPress admin plugin (requires WP 7.0+, PHP 8.1+) that embeds a floating AI chat assistant into wp-admin. It does two things:
+
+1. **Content Q&A** — RAG pipeline: BM25-style indexed retrieval → AI answer via `wp_ai_client_prompt()` (WordPress Core AI, provider-agnostic through the Connectors plugin).
+2. **Admin navigation** — Fuzzy command-palette suggestions using Fuse.js client-side matching against a static command registry and dynamically scraped sidebar items.
+
+The plugin ships no external API keys. All AI calls go through WordPress Core. Dewey does not replace WordPress's own AI tooling — it extends the admin UI with a persistent, context-aware assistant.
+
+## Repository layout
+
+```
+dewey/
+├── dewey.php                          # Plugin bootstrap, asset enqueue, hooks
+├── includes/
+│   ├── class-dewey-engine.php         # RAG pipeline (retrieve + generate)
+│   ├── class-dewey-indexer.php        # BM25-style option-backed search index
+│   ├── class-dewey-intent-router.php  # Regex intent parser for settings commands
+│   ├── class-dewey-rest-controller.php
+│   └── class-dewey-settings.php
+├── src/
+│   ├── index.js / index.css           # Entry points
+│   └── components/
+│       ├── App.js                     # Root component, wires hooks to panel
+│       └── dewey/
+│           ├── Dewey.jsx              # Animated SVG character (9 states)
+│           ├── useDewey.js            # Character state machine
+│           ├── useDeweyChat.js        # Chat orchestration, REST calls, storage
+│           ├── useNavigationCommands.js  # Fuse.js nav command matching
+│           ├── commands.js            # Static command registry (40 admin URLs)
+│           ├── copy.js                # All copy strings + DEWEY_SOUL_SYSTEM_PROMPT
+│           └── ui/
+│               ├── DeweyFab.jsx
+│               ├── DeweyPanel.jsx
+│               ├── MessageList.jsx
+│               └── MarkdownText.jsx
+├── scripts/
+│   ├── release-plugin.js              # Release + zip packaging
+│   ├── check-docs-consistency.js      # Validates version alignment
+│   └── check-security-basics.js      # Static security scan
+├── tests/
+│   ├── php/dewey-core-tests.php
+│   └── src/**/*.test.js
+└── docs/wiki/                         # Long-form technical docs
+```
+
+## JavaScript / React conventions
+
+- **Runtime**: `@wordpress/element` for React hooks, `@wordpress/components` for UI primitives, `@wordpress/i18n` for all user-facing strings. Text domain is always `'dewey'`.
+- **Formatting**: Prettier via `wp-scripts`. Run `npm run lint:js -- --fix` to auto-format. Always fix before committing.
+- **Tabs** for indentation (WordPress standard). Spaces inside parens: `if ( condition )`, `fn( arg )`, `[ 'a', 'b' ]`.
+- **`const`/`let`** only. Never `var`.
+- **No inline `/* global */` comments** unless strictly required (e.g., `ajaxurl`). Always list them at the top of the file.
+- **Hooks**: keep side effects in `useEffect`. Debounce with manual `useRef + setTimeout` (matches existing codebase — don't import `@wordpress/compose` unless already used).
+- **Memoize** with `useMemo`/`useCallback` wherever deps are stable. Don't memoize everything reflexively.
+- **No `dangerouslySetInnerHTML`** without explicit XSS justification. Prefer `MarkdownText` for AI output rendering.
+- **Security**: all user input displayed as text, never HTML. Fuse search operates on a static/scraper-controlled dataset only — never on user input as an eval target.
+
+## Navigation commands
+
+- The command registry lives in `commands.js`. Add entries there when new WP admin screens are relevant.
+- Each command needs: `id` (matches `core/commands` store ID where applicable), `label`, `explanation`, `descriptions[]` (fuzzy match phrases), `url` (relative wp-admin URL).
+- Commands without a `url` are editor-only dispatch commands — currently excluded from chip display. Do not add them unless the block editor is confirmed active.
+- Fuse threshold is `0.36`. Adjust carefully — too loose and content questions trigger nav chips, too strict and obvious navigation queries get missed.
+- The sidebar scraper runs once on mount and adds dynamic items from `#adminmenu`. It validates URLs with `isSafeAdminUrl()` — that check must stay. Never relax the URL allowlist without a security review.
+- `navigate()` resolves URLs relative to `ajaxurl` (always present in wp-admin). For `url.startsWith('/')` treat as an absolute path from origin.
+
+## PHP conventions
+
+- Requires at minimum: PHP `8.1`, WordPress `7.0`.
+- Direct access guard in every PHP file: `defined( 'ABSPATH' ) || exit;`
+- All user-facing values go through WordPress sanitization/escaping before output.
+- REST routes: capability check (`edit_posts` minimum) + nonce verification on every route. Rate limits enforced per-user via transients.
+- Settings mutations require HMAC-signed token confirmation flow (see `Dewey_Intent_Router` + `confirm-action` route).
+- Never write to the database outside of `Dewey_Settings::update()` and `Dewey_Indexer`.
+
+## AI integration
+
+- All AI calls go through `wp_ai_client_prompt()`. Dewey never calls OpenAI/Anthropic/Gemini directly.
+- `DEWEY_SOUL_SYSTEM_PROMPT` (in `copy.js`) defines Dewey's voice and is sent as `assistant_system_prompt` on every `/query` request. Do not fragment it across multiple calls.
+- Query expansion (keyword extraction before retrieval) uses a separate lightweight prompt. Keep it separate.
+- Response voice guardrails strip model disclaimer phrases before the answer reaches the user.
+
+## Testing
+
+```bash
+npm run lint          # JS + CSS
+npm run test:js       # Jest (jsdom, @testing-library/react)
+npm run test:php      # PHP core tests
+npm run check         # docs consistency + security scan
+```
+
+- Tests live alongside source: `*.test.js` co-located with `*.js`/`*.jsx`.
+- Mock `useDewey` in integration tests — the character state machine has no bearing on chat logic.
+- Do not skip or comment out existing tests. If a test is wrong, fix both the test and the code.
+
+## Release workflow
+
+Version must be aligned in **four places** before releasing:
+1. `package.json` → `version`
+2. `dewey.php` → `Version:` header + `DEWEY_VERSION` constant
+3. `readme.txt` → `Stable tag:`
+4. `SECURITY.md` → version number in the security controls header
+
+Run the full preflight, then release:
+
+```bash
+npm run lint && npm run test:js && npm run test:php && npm run check
+npm run release -- <version>
+```
+
+The release script validates version alignment, runs all checks, builds assets, stages a clean plugin copy, and zips it to `releases/dewey-<version>.zip`.
+
+## What to avoid
+
+- Do not add new `@wordpress/*` dependencies to `package.json` unless they are not already available as WordPress runtime globals. Most WP packages are available via `window.wp` in wp-admin without bundling.
+- Do not add jQuery. Dewey is fully React-based.
+- Do not use `localStorage` for anything security-sensitive. Conversation history uses localStorage with a 7-day TTL and 150KB cap — that is intentional and already in place.
+- Do not change Fuse.js to a remote/server-side model without a full security + performance review. The current approach is intentionally zero-latency and offline-capable.
+- Do not call `window.location` for navigation without first passing through `isSafeAdminUrl()` on scraper-sourced URLs.

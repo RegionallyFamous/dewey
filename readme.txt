@@ -4,7 +4,7 @@ Tags: ai, content search, admin assistant, writing assistant, knowledge base
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 1.0.19
+Stable tag: 1.0.20
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -21,6 +21,7 @@ Dewey gives editors a better workflow right now:
 * Ask plain-English questions in wp-admin — conversationally, like talking to a colleague.
 * Get AI answers grounded in your archive with inline citations and source snippets.
 * Follow-up question chips appear after every answer so the conversation stays natural.
+* Navigation command suggestions: type what you're looking for and get instant go-to chips for any wp-admin screen — no AI provider required.
 * Page-aware context: Dewey knows which screen you're on and offers relevant suggestions.
 * Post-aware context: when editing a post, Dewey knows the title, status, tags, and categories.
 * Persistent conversation: your chat thread survives page navigations in wp-admin.
@@ -46,6 +47,9 @@ No. Dewey retrieves relevant excerpts first and sends only the minimum context n
 Dewey runs in wp-admin for authenticated users with appropriate capabilities. Query/status routes are for editors, while maintenance actions like reindex are admin-only.
 
 == Changelog ==
+
+= 1.0.20 =
+* Navigation command suggestions: as you type in the Dewey panel, fuzzy-matched go-to chips appear for any wp-admin screen. Powered by Fuse.js client-side matching against a 40-command registry and dynamically scraped sidebar items. Works without an AI provider connected.
 
 = 1.0.19 =
 * Retrieval resilience: no-hit archive lookups now trigger targeted refinement prompts with possible title suggestions instead of dead-end responses.
