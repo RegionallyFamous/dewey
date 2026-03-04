@@ -67,9 +67,25 @@ Close the panel, navigate to a different screen, come back — your thread is st
 
 ---
 
+## Works the day you install it. Gets better with AI.
+
+Navigation and content actions — go-to chips, creating drafts, listing posts, publishing, trashing — work the moment you activate. No API keys, no configuration beyond activation.
+
+Connect an AI provider in **Settings → Connectors** and the rest unlocks:
+
+- **Ask anything about your archive** and get a grounded answer with sources and excerpts, not just a link list
+- **Follow-up question chips** after every answer so the conversation keeps moving
+- **Context-aware suggestions** — Dewey knows which screen you're on and which post you're editing, and uses that to give better answers
+- **Content audits, gap analysis, and pattern spotting** across your full archive
+- **Dewey-voiced answers** tuned to your tone and verbosity preferences
+
+WordPress supports a growing list of AI providers through Settings → Connectors. Once connected, Dewey is a different tool.
+
+---
+
 ## Get started
 
-Requires WordPress `7.0+` and PHP `8.1+`. An AI provider connected in Settings → Connectors unlocks questions and answers. Navigation and content actions work immediately without one.
+Requires WordPress `7.0+` and PHP `8.1+`.
 
 → [Installation and setup](docs/wiki/Getting-Started.md)
 
