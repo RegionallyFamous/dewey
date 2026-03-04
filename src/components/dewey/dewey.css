@@ -659,7 +659,9 @@
 .dewey-message__citation-snippet {
 	font-size: 11px;
 	line-height: 1.45;
-	color: #6c757d;
+
+	/* #50575e gives ~6.6:1 on white — comfortably above AA for small text. */
+	color: #50575e;
 	padding-left: 8px;
 	border-left: 2px solid rgba(0, 0, 0, 0.1);
 	margin-bottom: 2px;
@@ -676,13 +678,17 @@
 	margin-top: 5px;
 	font-size: 10px;
 	line-height: 1;
-	color: #9ba1a9;
+
+	/* #50575e on white gives ~6.6:1 contrast — passes WCAG AA for small text. */
+	color: #50575e;
 	letter-spacing: 0.01em;
 	user-select: none;
 }
 
+/* User bubbles have a blue accent background — use white at 85% opacity for contrast. */
 .dewey-message--user .dewey-message__timestamp {
 	text-align: right;
+	color: rgba( 255, 255, 255, 0.85 );
 }
 
 /* ─── Reduced motion support ─────────────────────────────────────────────────── */

@@ -383,7 +383,7 @@ final class Dewey_Engine {
 
 		if ( $has_context ) {
 			$system_instruction = __(
-				"You are Dewey — a sharp, friendly WordPress admin assistant living inside the dashboard. You have access to this site's archive. Use the provided content snippets to answer. Be conversational and direct. Cite sources inline as [post_id]. No fluff. Use clear Markdown formatting (short paragraphs, bullets when useful). Never claim you cannot access the site's content in this environment.",
+				"You are Dewey — a fun, quick-witted WordPress assistant who lives in the dashboard. You have access to this site's archive. Use the provided content snippets to answer. Be conversational, warm, and direct — like a knowledgeable friend, not a formal report. Cite sources inline as [post_id]. No fluff or filler. Use clean Markdown (short paragraphs, bullets when useful). Never claim you cannot access the site's content.",
 				'dewey'
 			);
 			$context_payload = implode( "\n\n", $context_blocks );
@@ -394,7 +394,7 @@ final class Dewey_Engine {
 			);
 		} else {
 			$system_instruction = __(
-				'You are Dewey — a sharp, friendly WordPress admin assistant living inside the dashboard. Answer from your general knowledge. Be conversational, practical, and concise. You know WordPress deeply. No fluff, no disclaimers. Use clear Markdown formatting. Never claim you cannot access the site in this environment.',
+				'You are Dewey — a fun, quick-witted WordPress assistant who lives in the dashboard. Answer from your general knowledge. Be conversational, warm, practical, and concise — like a clever colleague. You know WordPress deeply. No fluff, no disclaimers, no corporate speak. Use clean Markdown formatting.',
 				'dewey'
 			);
 			$user_prompt = $question;
@@ -433,8 +433,8 @@ final class Dewey_Engine {
 		$settings          = Dewey_Settings::get_all();
 		$tone              = (string) ( $settings['assistant_tone'] ?? 'match' );
 		$tone_modifier     = match ( $tone ) {
-			'casual'  => ' Tone: relaxed and friendly — use plain everyday language.',
-			'precise' => ' Tone: precise and technical — prefer exact terms and be specific.',
+			'casual'  => ' Tone: keep it super casual and upbeat — short sentences, contractions, a little banter is fine.',
+			'precise' => ' Tone: switch to precise and technical mode — exact terms, no hand-waving, be specific.',
 			default   => '',
 		};
 		if ( '' !== $tone_modifier ) {
@@ -575,22 +575,22 @@ final class Dewey_Engine {
 
 		$messages = array(
 			'assistant_tone' => array(
-				'casual'  => __( 'Done — keeping things relaxed and conversational from here on.', 'dewey' ),
-				'precise' => __( 'Done — switching to precise mode. Expect exact terms and no hand-waving.', 'dewey' ),
-				'match'   => __( 'Done — I\'ll match the tone to context, as usual.', 'dewey' ),
+				'casual'  => __( "Got it — keeping it casual and fun from here on. Don't worry, I'll still be useful.", 'dewey' ),
+				'precise' => __( "Switching to precise mode. Exact terms, no hand-waving. You've been warned.", 'dewey' ),
+				'match'   => __( "Back to reading the room — I'll match the vibe to whatever you're asking.", 'dewey' ),
 			),
 			'assistant_verbosity' => array(
-				'concise'  => __( 'Done — I\'ll keep it tight. No padding.', 'dewey' ),
-				'detailed' => __( 'Done — I\'ll explain more thoroughly, with context and examples.', 'dewey' ),
+				'concise'  => __( "Short and sharp it is. I'll get to the point.", 'dewey' ),
+				'detailed' => __( "Going deep — I'll explain the reasoning and add context where it helps.", 'dewey' ),
 			),
 			'citation_style' => array(
-				'titles' => __( 'Done — citations will show post titles.', 'dewey' ),
-				'links'  => __( 'Done — citations will show full URLs.', 'dewey' ),
+				'titles' => __( "Citations will show post titles from now on. Readable!", 'dewey' ),
+				'links'  => __( "Full URLs in citations. Link lovers unite.", 'dewey' ),
 			),
 			'retrieval_mode' => array(
-				'core'    => __( 'Done — using WordPress core search for retrieval.', 'dewey' ),
-				'indexed' => __( 'Done — using the Dewey index for retrieval.', 'dewey' ),
-				'auto'    => __( 'Done — I\'ll use the index when it\'s available, core otherwise.', 'dewey' ),
+				'core'    => __( "Using WordPress core search for retrieval. Old reliable.", 'dewey' ),
+				'indexed' => __( "Using the Dewey index — faster and smarter for big archives.", 'dewey' ),
+				'auto'    => __( "Auto mode — I'll use the index when it's ready, fall back to core otherwise.", 'dewey' ),
 			),
 		);
 
@@ -599,7 +599,7 @@ final class Dewey_Engine {
 		}
 
 		// Generic fallback for multi-key updates or unknown keys.
-		return __( 'Done — settings updated.', 'dewey' );
+		return __( "Done! Settings saved.", 'dewey' );
 	}
 
 	/**
