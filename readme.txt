@@ -4,7 +4,7 @@ Tags: ai, content search, admin assistant, writing assistant, knowledge base
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 1.0.17
+Stable tag: 1.0.18
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,6 +46,10 @@ No. Dewey retrieves relevant excerpts first and sends only the minimum context n
 Dewey runs in wp-admin for authenticated users with appropriate capabilities. Query/status routes are for editors, while maintenance actions like reindex are admin-only.
 
 == Changelog ==
+
+= 1.0.18 =
+* Patch release prep: version alignment and release packaging refresh.
+* Quality pass validated with lint, tests, security/docs checks, and build verification.
 
 = 1.0.17 =
 * Follow-up question chips: AI generates 3 contextual follow-up questions after each response, rendered as tappable chips for natural conversation continuation.
