@@ -121,6 +121,28 @@ final class Dewey_Intent_Router {
 			'user_facing_action' => 'Index only pages',
 			'confidence'         => 0.95,
 		),
+		array(
+			'pattern'            => '/\b(include|index|search)\b.*\b(drafts?|private posts?|unpublished)\b/',
+			'action'             => 'set_settings',
+			'params'             => array(
+				'allow_nonpublic_indexing' => true,
+				'indexed_statuses'         => array( 'publish', 'draft', 'private' ),
+			),
+			'requires_confirm'   => true,
+			'user_facing_action' => 'Include drafts/private content in Dewey indexing',
+			'confidence'         => 0.96,
+		),
+		array(
+			'pattern'            => '/\b(disable|turn off|stop|exclude)\b.*\b(drafts?|private posts?|unpublished)\b/',
+			'action'             => 'set_settings',
+			'params'             => array(
+				'allow_nonpublic_indexing' => false,
+				'indexed_statuses'         => array( 'publish' ),
+			),
+			'requires_confirm'   => true,
+			'user_facing_action' => 'Restrict Dewey indexing to published content only',
+			'confidence'         => 0.96,
+		),
 	);
 
 	/**

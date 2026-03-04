@@ -52,6 +52,27 @@ final class Dewey_Engine {
 		if ( is_wp_error( $retrieval ) ) {
 			return $retrieval;
 		}
+		if (
+			empty( $retrieval['citations'] ) &&
+			self::is_archive_lookup_question( $question )
+		) {
+			$suggestions = self::build_title_suggestions(
+				$question,
+				(string) ( $retrieval['retrieval_mode'] ?? 'core' )
+			);
+			$fallback = self::build_refinement_response( $question, $suggestions );
+			return array(
+				'answer'     => $fallback['answer'],
+				'follow_ups' => $fallback['follow_ups'],
+				'citations'  => array(),
+				'meta'       => array(
+					'retrieval_mode' => $retrieval['retrieval_mode'],
+					'result_count'   => 0,
+					'provider'       => '',
+					'model'          => '',
+				),
+			);
+		}
 
 		$answer_result = self::generate_answer( $question, $retrieval['context_blocks'], $assistant_system_prompt, $history, $page_context, $post_id );
 		if ( is_wp_error( $answer_result ) ) {
@@ -90,9 +111,7 @@ final class Dewey_Engine {
 		$max_total = Dewey_Settings::search_max_results();
 
 		foreach ( $search_terms as $term ) {
-			$term_results = 'indexed' === $effective_mode
-				? Dewey_Indexer::search_index( $term )
-				: self::search_core( $term );
+			$term_results = self::search_with_mode( $term, $effective_mode );
 
 			if ( ! is_array( $term_results ) ) {
 				continue;
@@ -110,6 +129,21 @@ final class Dewey_Engine {
 					$merged[ $post_id ] = $result;
 				}
 			}
+		}
+
+		if ( empty( $merged ) ) {
+			$title_fallback = self::search_title_fallback( $question, $effective_mode, $max_total );
+			foreach ( $title_fallback as $result ) {
+				$post_id = (int) ( $result['post_id'] ?? 0 );
+				if ( $post_id <= 0 ) {
+					continue;
+				}
+				$merged[ $post_id ] = $result;
+			}
+		}
+
+		if ( ! empty( $merged ) ) {
+			self::apply_date_bias( $merged, $question );
 		}
 
 		uasort(
@@ -247,10 +281,210 @@ final class Dewey_Engine {
 				'title'     => get_the_title( $post ),
 				'permalink' => get_permalink( $post ),
 				'snippet'   => wp_trim_words( $text, 80, '…' ),
+				'modified'  => get_post_modified_time( 'c', true, $post ),
 			);
 		}
 
 		return $results;
+	}
+
+	/**
+	 * Search helper that routes by resolved retrieval mode.
+	 *
+	 * @param string $term
+	 * @param string $mode
+	 * @return array<int,array<string,mixed>>
+	 */
+	private static function search_with_mode( string $term, string $mode ): array {
+		if ( 'indexed' === $mode ) {
+			return Dewey_Indexer::search_index( $term );
+		}
+
+		return self::search_core( $term );
+	}
+
+	/**
+	 * If normal retrieval misses, run a title-focused fallback pass.
+	 *
+	 * @param string $question
+	 * @param string $mode
+	 * @param int    $limit
+	 * @return array<int,array<string,mixed>>
+	 */
+	private static function search_title_fallback( string $question, string $mode, int $limit ): array {
+		$phrase = self::extract_title_phrase( $question );
+		if ( '' === $phrase ) {
+			return array();
+		}
+
+		$queries = array( '"' . $phrase . '"', $phrase );
+		$matches = array();
+		$seen    = array();
+
+		foreach ( $queries as $query ) {
+			$results = self::search_with_mode( $query, $mode );
+			foreach ( $results as $result ) {
+				$post_id = (int) ( $result['post_id'] ?? 0 );
+				$title   = strtolower( (string) ( $result['title'] ?? '' ) );
+				if ( $post_id <= 0 || '' === $title || isset( $seen[ $post_id ] ) ) {
+					continue;
+				}
+
+				$phrase_lower = strtolower( $phrase );
+				$contains     = false !== strpos( $title, $phrase_lower );
+				$overlap      = self::token_overlap_score( $title, $phrase_lower );
+				if ( ! $contains && $overlap < 0.34 ) {
+					continue;
+				}
+
+				$result['score'] = (float) ( $result['score'] ?? 1.0 ) + ( $contains ? 3.0 : 1.2 ) + $overlap;
+				$matches[]       = $result;
+				$seen[ $post_id ] = true;
+			}
+		}
+
+		usort(
+			$matches,
+			static function ( array $a, array $b ): int {
+				return ( $b['score'] ?? 0 ) <=> ( $a['score'] ?? 0 );
+			}
+		);
+
+		return array_values( array_slice( $matches, 0, max( 1, $limit ) ) );
+	}
+
+	/**
+	 * Apply a date-aware boost for year-specific and recency queries.
+	 *
+	 * @param array<int,array<string,mixed>> $merged
+	 * @param string                         $question
+	 * @return void
+	 */
+	private static function apply_date_bias( array &$merged, string $question ): void {
+		$hint = self::extract_date_hint( $question );
+		if ( empty( $hint ) ) {
+			return;
+		}
+
+		foreach ( $merged as &$result ) {
+			$score       = (float) ( $result['score'] ?? 1.0 );
+			$modified    = (string) ( $result['modified'] ?? '' );
+			$modified_ts = '' !== $modified ? strtotime( $modified ) : false;
+			if ( false === $modified_ts ) {
+				continue;
+			}
+
+			if ( isset( $hint['year'] ) ) {
+				$year_distance = abs( (int) gmdate( 'Y', $modified_ts ) - (int) $hint['year'] );
+				if ( 0 === $year_distance ) {
+					$score += 2.5;
+				} elseif ( 1 === $year_distance ) {
+					$score += 1.0;
+				} else {
+					$score -= min( 0.6, 0.2 * $year_distance );
+				}
+			}
+
+			if ( ! empty( $hint['recent'] ) ) {
+				$days_old = max( 0.0, ( time() - $modified_ts ) / 86400 );
+				$score   += max( 0.0, 1.5 - ( $days_old / 365 ) );
+			}
+
+			$result['score'] = $score;
+		}
+		unset( $result );
+	}
+
+	/**
+	 * Parse date hints from the user question.
+	 *
+	 * @param string $question
+	 * @return array<string,mixed>
+	 */
+	private static function extract_date_hint( string $question ): array {
+		$hint       = array();
+		$normalized = strtolower( $question );
+
+		if ( preg_match( '/\b(19\d{2}|20\d{2})\b/', $normalized, $match ) ) {
+			$hint['year'] = (int) $match[1];
+		}
+
+		if ( preg_match( '/\b(recent|lately|latest|newest|this year|last month|last week)\b/i', $normalized ) ) {
+			$hint['recent'] = true;
+		}
+
+		return $hint;
+	}
+
+	/**
+	 * Extract likely title phrase from free-form query.
+	 *
+	 * @param string $question
+	 * @return string
+	 */
+	private static function extract_title_phrase( string $question ): string {
+		if ( preg_match( '/["\']([^"\']{3,120})["\']/', $question, $quoted ) ) {
+			return trim( (string) $quoted[1] );
+		}
+
+		$normalized = strtolower( $question );
+		$normalized = preg_replace(
+			'/\b(do|did|we|have|any|posts?|pages?|about|find|look|for|show|me|the|a|an|called|titled|title|named|with|on|from|in|since|around|please|can|you)\b/',
+			' ',
+			$normalized
+		);
+		$normalized = preg_replace( '/[^a-z0-9\s-]/', ' ', (string) $normalized );
+		$normalized = trim( preg_replace( '/\s+/', ' ', (string) $normalized ) );
+		if ( '' === $normalized ) {
+			return '';
+		}
+
+		$tokens = array_values(
+			array_filter(
+				explode( ' ', $normalized ),
+				static function ( string $token ): bool {
+					return strlen( $token ) >= 3;
+				}
+			)
+		);
+		if ( empty( $tokens ) ) {
+			return '';
+		}
+
+		return implode( ' ', array_slice( $tokens, 0, 6 ) );
+	}
+
+	/**
+	 * Lightweight token-overlap score for title similarity.
+	 *
+	 * @param string $left
+	 * @param string $right
+	 * @return float
+	 */
+	private static function token_overlap_score( string $left, string $right ): float {
+		$left_tokens = array_unique(
+			array_filter(
+				preg_split( '/[^a-z0-9]+/i', strtolower( $left ) ) ?: array(),
+				static function ( string $token ): bool {
+					return strlen( $token ) >= 3;
+				}
+			)
+		);
+		$right_tokens = array_unique(
+			array_filter(
+				preg_split( '/[^a-z0-9]+/i', strtolower( $right ) ) ?: array(),
+				static function ( string $token ): bool {
+					return strlen( $token ) >= 3;
+				}
+			)
+		);
+
+		if ( empty( $left_tokens ) || empty( $right_tokens ) ) {
+			return 0.0;
+		}
+
+		$overlap = count( array_intersect( $left_tokens, $right_tokens ) );
+		return $overlap / max( count( $left_tokens ), count( $right_tokens ) );
 	}
 
 	/**
@@ -592,6 +826,10 @@ final class Dewey_Engine {
 				'indexed' => __( "Using the Dewey index — faster and smarter for big archives.", 'dewey' ),
 				'auto'    => __( "Auto mode — I'll use the index when it's ready, fall back to core otherwise.", 'dewey' ),
 			),
+			'allow_nonpublic_indexing' => array(
+				'1' => __( 'Draft/private indexing is now enabled. I will include unpublished content in search.', 'dewey' ),
+				''  => __( 'Draft/private indexing is off. I will stick to published content only.', 'dewey' ),
+			),
 		);
 
 		if ( isset( $messages[ $key ][ $value ] ) ) {
@@ -626,6 +864,80 @@ final class Dewey_Engine {
 		}
 
 		return substr( $value, 0, $limit );
+	}
+
+	/**
+	 * Heuristic: detect archive-lookup questions where an empty retrieval should
+	 * trigger a targeted refinement prompt rather than a generic response.
+	 *
+	 * @param string $question
+	 * @return bool
+	 */
+	private static function is_archive_lookup_question( string $question ): bool {
+		$normalized = strtolower( trim( $question ) );
+		if ( '' === $normalized ) {
+			return false;
+		}
+
+		return 1 === preg_match(
+			'/\b(post|posts|article|articles|published|publish|archive|content|wrote|written|title|tag|category|categories|did we|do we have|have we)\b/i',
+			$normalized
+		);
+	}
+
+	/**
+	 * Build a deterministic "next best step" response for empty archive matches.
+	 *
+	 * @param string            $question
+	 * @param array<int,string> $title_suggestions
+	 * @return array{answer:string,follow_ups:array<int,string>}
+	 */
+	private static function build_refinement_response( string $question, array $title_suggestions = array() ): array {
+		$trimmed_question = self::safe_substr( trim( $question ), 140 );
+		$answer           = sprintf(
+			/* translators: %s: user's original question */
+			__(
+				"I took a swing at your archive for \"%s\" and came up empty on the first pass.\n\nNo stopping here. Give me one concrete anchor and I will hunt it down:\n- exact title (or even a partial title phrase)\n- a tag/category name\n- a rough date range (month/year is enough)\n- one unique keyword you remember from the post\n\nIf you want, I can also try a broader pass and then narrow by date.",
+				'dewey'
+			),
+			$trimmed_question
+		);
+		if ( ! empty( $title_suggestions ) ) {
+			$answer .= "\n\n" . __( 'Possible title matches I can see:', 'dewey' ) . "\n";
+			foreach ( array_slice( $title_suggestions, 0, 3 ) as $title ) {
+				$answer .= '- ' . $title . "\n";
+			}
+		}
+
+		return array(
+			'answer'     => $answer,
+			'follow_ups' => array(
+				__( 'Do you remember any part of the title?', 'dewey' ),
+				__( 'What tag or category was it likely under?', 'dewey' ),
+				__( 'About when was it published?', 'dewey' ),
+			),
+		);
+	}
+
+	/**
+	 * Build "did you mean" title suggestions for no-hit responses.
+	 *
+	 * @param string $question
+	 * @param string $mode
+	 * @return array<int,string>
+	 */
+	private static function build_title_suggestions( string $question, string $mode ): array {
+		$candidates = self::search_title_fallback( $question, $mode, 6 );
+		$titles     = array();
+		foreach ( $candidates as $candidate ) {
+			$title = trim( (string) ( $candidate['title'] ?? '' ) );
+			if ( '' === $title ) {
+				continue;
+			}
+			$titles[] = $title;
+		}
+
+		return array_values( array_slice( array_unique( $titles ), 0, 3 ) );
 	}
 
 	/**

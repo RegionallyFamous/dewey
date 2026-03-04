@@ -135,8 +135,12 @@ if ( ! function_exists( 'get_post_types' ) ) {
 }
 
 if ( ! function_exists( 'get_post_stati' ) ) {
-	function get_post_stati() {
-		return array( 'publish', 'private' );
+	function get_post_stati( $args = array() ) {
+		$all = array( 'publish', 'private', 'draft', 'pending', 'future' );
+		if ( is_array( $args ) && ! empty( $args['public'] ) ) {
+			return array( 'publish' );
+		}
+		return $all;
 	}
 }
 
@@ -296,6 +300,26 @@ assert_true(
 	)['indexed_post_types']
 );
 
+$GLOBALS['dewey_test_caps'] = array( 'manage_options' => true );
+assert_true(
+	'Dewey_Settings allows draft status only with explicit nonpublic opt-in',
+	array( 'publish', 'draft' ) === Dewey_Settings::sanitize_all(
+		array(
+			'allow_nonpublic_indexing' => true,
+			'indexed_statuses'         => array( 'publish', 'draft' ),
+		)
+	)['indexed_statuses']
+);
+assert_true(
+	'Dewey_Settings blocks draft status when nonpublic opt-in is disabled',
+	array( 'publish' ) === Dewey_Settings::sanitize_all(
+		array(
+			'allow_nonpublic_indexing' => false,
+			'indexed_statuses'         => array( 'publish', 'draft' ),
+		)
+	)['indexed_statuses']
+);
+
 $router = new Dewey_Intent_Router();
 
 $route_reindex = $router->route( 'Please run a full reindex of the archive' );
@@ -317,6 +341,14 @@ $route_archive = $router->route( 'what did i write about customer research?' );
 assert_true(
 	'Intent router falls back to archive intent',
 	'archive' === $route_archive['type']
+);
+
+$route_include_drafts = $router->route( 'please include drafts in indexing' );
+assert_true(
+	'Intent router maps draft indexing enable intent',
+	'settings' === $route_include_drafts['type'] &&
+		true === ( $route_include_drafts['requires_confirm'] ?? false ) &&
+		true === ( $route_include_drafts['params']['allow_nonpublic_indexing'] ?? false )
 );
 
 $GLOBALS['dewey_test_registered_routes'] = array();
@@ -364,6 +396,14 @@ $engine_error = Dewey_Engine::answer_question( '' );
 assert_true(
 	'Engine rejects empty questions',
 	is_wp_error( $engine_error )
+);
+
+$engine_refine = Dewey_Engine::answer_question( 'Do we have any posts about onboarding?' );
+assert_true(
+	'Engine asks for refinement when archive lookup has no hits',
+	is_array( $engine_refine ) &&
+		str_contains( (string) ( $engine_refine['answer'] ?? '' ), 'concrete anchor' ) &&
+		3 === count( $engine_refine['follow_ups'] ?? array() )
 );
 
 echo "PHP core tests passed.\n";

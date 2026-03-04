@@ -366,9 +366,11 @@ add_action( 'plugins_loaded', 'dewey_load_textdomain' );
  *
  * @param int     $post_id
  * @param WP_Post $post
+ * @param bool    $require_indexed_status Whether the post must currently be in
+ *                                        an indexed status to schedule rebuild.
  * @return void
  */
-function dewey_maybe_schedule_reindex( int $post_id, WP_Post $post ): void {
+function dewey_maybe_schedule_reindex( int $post_id, WP_Post $post, bool $require_indexed_status = true ): void {
 	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
 		return;
 	}
@@ -385,7 +387,7 @@ function dewey_maybe_schedule_reindex( int $post_id, WP_Post $post ): void {
 		return;
 	}
 
-	if ( ! in_array( $post->post_status, $statuses, true ) ) {
+	if ( $require_indexed_status && ! in_array( $post->post_status, $statuses, true ) ) {
 		return;
 	}
 
@@ -411,6 +413,37 @@ add_action(
 			dewey_maybe_schedule_reindex( $post_id, $post );
 		}
 	}
+);
+
+/**
+ * Reindex when a post transitions into or out of an indexed status.
+ *
+ * This keeps the index accurate when content is unpublished (e.g. publish ->
+ * draft), where relying only on current status checks would leave stale hits.
+ *
+ * @param string  $new_status
+ * @param string  $old_status
+ * @param WP_Post $post
+ * @return void
+ */
+add_action(
+	'transition_post_status',
+	static function ( string $new_status, string $old_status, WP_Post $post ) {
+		$settings = Dewey_Settings::get_all();
+		$statuses = is_array( $settings['indexed_statuses'] ?? null )
+			? $settings['indexed_statuses']
+			: array( 'publish' );
+		if (
+			! in_array( $old_status, $statuses, true ) &&
+			! in_array( $new_status, $statuses, true )
+		) {
+			return;
+		}
+
+		dewey_maybe_schedule_reindex( (int) $post->ID, $post, false );
+	},
+	10,
+	3
 );
 
 /**

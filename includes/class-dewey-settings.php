@@ -31,6 +31,7 @@ final class Dewey_Settings {
 		'cost_mode'           => 'minimize', // minimize|balanced
 		'indexed_post_types'  => array( 'post', 'page' ),
 		'indexed_statuses'    => array( 'publish' ),
+		'allow_nonpublic_indexing' => false,
 		'assistant_tone'      => 'match', // match|casual|precise
 		'assistant_verbosity' => 'concise', // concise|detailed
 		'citation_style'      => 'titles', // titles|links
@@ -95,6 +96,12 @@ final class Dewey_Settings {
 	 */
 	public static function update( array $updates ): array {
 		$current  = self::get_all();
+		if (
+			array_key_exists( 'indexed_statuses', $updates ) &&
+			! array_key_exists( 'allow_nonpublic_indexing', $updates )
+		) {
+			$updates['allow_nonpublic_indexing'] = (bool) ( $current['allow_nonpublic_indexing'] ?? false );
+		}
 		$sanitized = self::sanitize_all( $updates );
 		$merged   = array_merge( $current, $sanitized );
 
@@ -136,8 +143,12 @@ final class Dewey_Settings {
 			$clean['indexed_post_types'] = self::sanitize_post_types( $settings['indexed_post_types'] );
 		}
 
+		if ( array_key_exists( 'allow_nonpublic_indexing', $settings ) ) {
+			$clean['allow_nonpublic_indexing'] = (bool) $settings['allow_nonpublic_indexing'];
+		}
+		$allow_nonpublic = (bool) ( $clean['allow_nonpublic_indexing'] ?? self::DEFAULTS['allow_nonpublic_indexing'] );
 		if ( array_key_exists( 'indexed_statuses', $settings ) ) {
-			$clean['indexed_statuses'] = self::sanitize_statuses( $settings['indexed_statuses'] );
+			$clean['indexed_statuses'] = self::sanitize_statuses( $settings['indexed_statuses'], $allow_nonpublic );
 		}
 
 		if ( array_key_exists( 'search_max_results', $settings ) ) {
@@ -226,15 +237,28 @@ final class Dewey_Settings {
 
 	/**
 	 * @param mixed $statuses
+	 * @param bool  $allow_nonpublic
 	 * @return array
 	 */
-	private static function sanitize_statuses( $statuses ): array {
+	private static function sanitize_statuses( $statuses, bool $allow_nonpublic = false ): array {
 		$list = is_array( $statuses ) ? $statuses : array( $statuses );
 		$list = array_filter( array_map( 'sanitize_key', $list ) );
 
-		$allowed = get_post_stati( array( 'public' => true ), 'names' );
-		if ( empty( $allowed ) ) {
-			$allowed = array( 'publish' );
+		$allowed_public = get_post_stati( array( 'public' => true ), 'names' );
+		if ( empty( $allowed_public ) ) {
+			$allowed_public = array( 'publish' );
+		}
+
+		$allowed_nonpublic = array( 'draft', 'pending', 'future', 'private' );
+
+		$allowed = $allowed_public;
+		if ( $allow_nonpublic && current_user_can( 'manage_options' ) ) {
+			$all_known = get_post_stati( array(), 'names' );
+			if ( ! is_array( $all_known ) ) {
+				$all_known = array();
+			}
+			$nonpublic_existing = array_intersect( $allowed_nonpublic, $all_known );
+			$allowed = array_values( array_unique( array_merge( $allowed_public, $nonpublic_existing ) ) );
 		}
 
 		$clean = array_values( array_intersect( $list, $allowed ) );
