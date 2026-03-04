@@ -48,6 +48,14 @@ To add a new command, append an entry to `commands.js` following the existing st
 - `/status` includes `index_health`, `integrity`, and retrieval `telemetry` for operational visibility
 - Non-public indexing (draft/private) is admin-gated and opt-in via settings intent
 - Admin screen context contract is injected from `dewey.php` (`dewey_build_admin_screen_context`) and sent on `/query` as `screen_context`
+- WordPress reference snippets are sourced from `includes/knowledge-base.json` via `Dewey_Knowledge`
+
+## Action Intents
+
+- Intent parsing for create/list/trash/publish lives in `includes/class-dewey-intent-router.php`
+- Execution and capability checks live in `includes/class-dewey-action-handler.php`
+- Destructive actions require signed action tokens and run through `/execute-action`
+- Frontend action chips and result rendering live in `useDeweyChat` + `ui/MessageList`
 
 ## Eval Fixtures
 

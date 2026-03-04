@@ -348,6 +348,7 @@ if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 	}
 }
 
+require_once __DIR__ . '/../../includes/class-dewey-knowledge.php';
 require_once __DIR__ . '/../../includes/class-dewey-settings.php';
 require_once __DIR__ . '/../../includes/class-dewey-intent-router.php';
 require_once __DIR__ . '/../../includes/class-dewey-indexer.php';

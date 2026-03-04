@@ -20,6 +20,7 @@ Built by [Regionally Famous](https://regionallyfamous.com).
 - Conversational AI answers grounded in your archive — with inline citations and source snippet previews.
 - Follow-up question chips after every response so the conversation stays natural.
 - **Navigation command suggestions**: as you type, Dewey surfaces instant go-to chips for any wp-admin screen — posts, media, themes, settings, users, and more. Works even without an AI provider connected.
+- **Action workflows inside chat**: create drafts, list recent content, and run confirm-gated publish/trash flows based on your actual WordPress capabilities.
 - Page-aware context: Dewey detects which wp-admin screen you're on and offers relevant suggestions.
 - Post-aware context: when editing a specific post, Dewey knows the title, status, tags, and categories.
 - Smart return greeting: reopening Dewey within 4 hours references your last topic.
@@ -28,6 +29,7 @@ Built by [Regionally Famous](https://regionallyfamous.com).
 - Relative message timestamps that update live.
 - BM25-style indexed retrieval with AI-powered query expansion and automatic re-indexing on content changes.
 - Retrieval resilience features: title-focused fallback matching, date-aware ranking bias, and deterministic no-hit refinement prompts.
+- Bundled WordPress knowledge pack: curated technical references are injected into prompts when your question matches known core topics.
 - Index quality monitoring: status telemetry counters, staleness signals, and automatic orphan-entry integrity cleanup.
 - Tone, verbosity, and citation style settings wired into the AI prompt.
 - Dewey-voiced settings confirmations and error messages.

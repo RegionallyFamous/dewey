@@ -12,10 +12,12 @@ The current repository ships:
 - retrieval fallback pipeline for low-signal queries (title-first fallback, date-aware ranking, no-hit refinement prompts)
 - structured admin screen context pipeline (`screenContext`) passed frontend -> REST -> engine for screen-aware answers
 - screen adapter context blocks for dashboard/plugins/themes/users/media/settings/editor screens
+- action-intent pipeline (create/list/trash/publish) with confirmation-gated destructive operations
+- bundled WordPress knowledge pack (`includes/knowledge-base.json`) injected into prompts for core WP technical questions
 - multi-turn conversation history sent with every query (last 10 turns)
 - AI answer generation pipeline with tone, verbosity, and citation style settings
 - site stats grounding (post count, last published date, top categories) in every system instruction
-- Dewey REST engine routes (`query`, `status`, `reindex`, `confirm-action`) with capability and rate-limit guardrails
+- Dewey REST engine routes (`query`, `status`, `reindex`, `confirm-action`, `execute-action`) with capability and rate-limit guardrails
 - index health observability via `/status` (staleness warning, integrity report auto-heal, retrieval telemetry counters)
 - replayable retrieval eval fixtures in `tests/evals/retrieval-evals.json` validated during PHP core tests
 - settings sanitization, intent routing, and settings-change confirmation in Dewey's voice
@@ -30,6 +32,9 @@ dewey/
 │   ├── class-dewey-engine.php
 │   ├── class-dewey-indexer.php
 │   ├── class-dewey-intent-router.php
+│   ├── class-dewey-action-handler.php
+│   ├── class-dewey-knowledge.php
+│   ├── knowledge-base.json
 │   ├── class-dewey-rest-controller.php
 │   └── class-dewey-settings.php
 ├── src/

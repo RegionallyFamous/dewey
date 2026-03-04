@@ -739,6 +739,18 @@ final class Dewey_Engine {
 			$system_instruction = 'Site overview: ' . $site_stats . "\n\n" . $system_instruction;
 		}
 
+		// Inject WordPress reference documentation when the question maps to a
+		// known WordPress topic.  Keeps injections tight (~800 tokens max) by
+		// capping at two topics and requiring a minimum relevance score.
+		$wp_docs = Dewey_Knowledge::find_relevant( $question );
+		if ( ! empty( $wp_docs ) ) {
+			$docs_context = "WordPress reference context:\n";
+			foreach ( $wp_docs as $doc ) {
+				$docs_context .= '### ' . $doc['title'] . "\n" . $doc['excerpt'] . "\n\n";
+			}
+			$system_instruction = $docs_context . "\n\n" . $system_instruction;
+		}
+
 		// Ask the model to append follow-up questions in a parseable tag so we can
 		// surface them as chips without a second API call.
 		$system_instruction .=

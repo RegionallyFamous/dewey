@@ -9,6 +9,7 @@ Confirm versions match across:
 - `Stable tag` in `readme.txt`
 - `SECURITY.md` version header
 - release URL in `blueprint.json`
+- latest changelog section in `readme.txt` matches shipped features
 
 ## Preflight
 
@@ -41,3 +42,7 @@ Release zips are written to `releases/`.
   - `index_health` is present
   - `integrity` report is present
   - `telemetry` counters are present
+- Validate action-intent safety:
+  - `/execute-action` exists
+  - destructive actions require token-confirmed execution
+  - capability errors are returned when user lacks permissions

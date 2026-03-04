@@ -1,0 +1,246 @@
+{
+	"version": "1.0",
+	"generated": "2026-03-04",
+	"topics": [
+		{
+			"id": "hooks",
+			"title": "WordPress Hooks — Actions & Filters",
+			"uri": "wordpress://advanced/wordpress-hooks",
+			"category": "advanced",
+			"keywords": ["hook", "hooks", "action", "filter", "add_action", "add_filter", "do_action", "apply_filters", "remove_action", "remove_filter", "priority", "callback", "wp_head", "init", "save_post", "wp_footer", "admin_menu", "wp_enqueue_scripts", "the_content", "pre_get_posts"],
+			"excerpt": "WordPress has two types of hooks: **actions** (execute code at a point) and **filters** (modify data before it's used).\n\n**Add an action:**\n`add_action( 'hook_name', 'callback_function', $priority, $accepted_args );`\nDefault priority is 10. Lower runs earlier. Use `do_action( 'hook_name' )` to fire custom actions.\n\n**Add a filter:**\n`add_filter( 'hook_name', 'callback_function', $priority, $accepted_args );`\nFilters MUST return the (modified) value. Use `apply_filters( 'hook_name', $value )` for custom filters.\n\n**Remove hooks:**\n`remove_action( 'init', 'function_name', 10 );`\n`remove_filter( 'the_content', 'wpautop' );`\nPriority must match what was used when the hook was added.\n\n**Common action hooks:** `init`, `wp_loaded`, `admin_init`, `wp_head`, `wp_footer`, `admin_menu`, `save_post`, `wp_enqueue_scripts`, `admin_enqueue_scripts`, `rest_api_init`, `plugins_loaded`, `after_setup_theme`, `template_redirect`.\n\n**Common filter hooks:** `the_content`, `the_title`, `excerpt_length`, `pre_get_posts`, `wp_nav_menus`, `query_vars`, `upload_mimes`, `body_class`, `post_class`.\n\n**Multiple args example:**\n`add_action( 'save_post', 'my_callback', 10, 3 );`\n`function my_callback( $post_id, $post, $update ) { ... }`\n\n**Best practices:** Always check `DOING_AUTOSAVE`, `current_user_can()`, and nonce before processing in `save_post`. Avoid using priority 1 or PHP_INT_MAX unless necessary. Document custom hooks for other developers."
+		},
+		{
+			"id": "custom-post-types",
+			"title": "Custom Post Types (CPT)",
+			"uri": "wordpress://advanced/custom-post-types",
+			"category": "advanced",
+			"keywords": ["cpt", "custom post type", "register_post_type", "post_type", "rewrite", "has_archive", "supports", "show_in_rest", "labels", "hierarchical", "capability_type", "map_meta_cap", "archive", "slug", "query_var", "WP_Query", "post type", "single-product.php"],
+			"excerpt": "Register a CPT in the `init` hook:\n\n```php\nregister_post_type( 'product', array(\n  'label'         => 'Products',\n  'public'        => true,\n  'has_archive'   => true,\n  'show_in_rest'  => true, // required for block editor\n  'rewrite'       => array( 'slug' => 'products' ),\n  'supports'      => array( 'title', 'editor', 'thumbnail', 'excerpt' ),\n  'menu_icon'     => 'dashicons-cart',\n  'menu_position' => 5,\n) );\n```\n\n**Template files:** `single-{post_type}.php`, `archive-{post_type}.php`. WordPress falls back through the hierarchy if not found.\n\n**Query CPTs:**\n`new WP_Query( array( 'post_type' => 'product', 'posts_per_page' => 10 ) );`\n\n**Key args:** `hierarchical` (true = like pages, false = like posts), `capability_type` and `map_meta_cap` for custom capabilities, `publicly_queryable`, `show_ui`, `show_in_menu`, `can_export`.\n\n**After registering**, flush rewrite rules once: `flush_rewrite_rules()` — do this only on plugin activation/deactivation, NOT on every request.\n\n**Best practices:** Register in a plugin, not a theme (data survives theme changes). Use `show_in_rest => true` for block editor compatibility. Add to search with `exclude_from_search => false`."
+		},
+		{
+			"id": "taxonomies",
+			"title": "Custom Taxonomies",
+			"uri": "wordpress://advanced/taxonomies",
+			"category": "advanced",
+			"keywords": ["taxonomy", "register_taxonomy", "term", "terms", "category", "tag", "hierarchical", "tax_query", "get_terms", "wp_set_post_terms", "get_term_meta", "update_term_meta", "term_id", "slug", "rewrite", "show_in_rest", "custom taxonomy"],
+			"excerpt": "Register a taxonomy in the `init` hook:\n\n```php\nregister_taxonomy( 'genre', array( 'post', 'book' ), array(\n  'hierarchical'  => true,   // true = like categories, false = like tags\n  'public'        => true,\n  'show_in_rest'  => true,\n  'rewrite'       => array( 'slug' => 'genre' ),\n  'show_admin_column' => true,\n) );\n```\n\n**Query by taxonomy:**\n```php\nnew WP_Query( array(\n  'tax_query' => array( array(\n    'taxonomy' => 'genre',\n    'field'    => 'slug',\n    'terms'    => 'action',\n  ) ),\n) );\n```\n\n**Multiple taxonomy conditions** use `'relation' => 'AND'` or `'OR'` in `tax_query`.\n\n**Term functions:** `get_terms()`, `wp_set_post_terms()`, `wp_get_post_terms()`, `get_term_by()`, `get_term_meta()`, `update_term_meta()`, `add_term_meta()`.\n\n**Archive template:** `taxonomy-{taxonomy}-{term}.php` → `taxonomy-{taxonomy}.php` → `taxonomy.php` → `archive.php`.\n\n**Flush rewrite rules** once after registration (on activation hook only)."
+		},
+		{
+			"id": "options-api",
+			"title": "Options API",
+			"uri": "wordpress://core/options",
+			"category": "core",
+			"keywords": ["option", "options", "get_option", "update_option", "add_option", "delete_option", "autoload", "wp_options", "settings", "configuration", "wp_parse_args"],
+			"excerpt": "Simple key-value storage in `wp_options` table.\n\n```php\n// CRUD\n$val = get_option( 'my_option', 'default' ); // second arg = default\nupdate_option( 'my_option', $value );         // creates if missing\nadd_option( 'my_option', $value, '', 'no' );  // only if not exists\ndelete_option( 'my_option' );\n```\n\n**Autoloading:** Options autoload by default (loaded on every request). For large or rarely-used options, disable: `update_option( 'big_option', $value, false );` or `add_option( 'big_option', $value, '', 'no' );`\n\n**Storing arrays:** WordPress serializes automatically. Retrieve with `get_option()` and use `is_array()` check.\n\n**Performance pattern:**\n```php\n$settings = get_option( 'my_settings', array() );\n$settings = wp_parse_args( $settings, $defaults );\n```\n\n**Transients** are better for temporary/cached data. **Use descriptive, prefixed option names** to avoid collisions (e.g. `myplugin_api_key` not `api_key`). **Delete on uninstall** to keep the database clean."
+		},
+		{
+			"id": "transients",
+			"title": "Transients API — Temporary Caching",
+			"uri": "wordpress://core/transients",
+			"category": "core",
+			"keywords": ["transient", "transients", "set_transient", "get_transient", "delete_transient", "cache", "caching", "HOUR_IN_SECONDS", "DAY_IN_SECONDS", "WEEK_IN_SECONDS", "expiration", "ttl", "temporary data"],
+			"excerpt": "Transients provide temporary cached storage with automatic expiration.\n\n```php\n// Store (expires in 1 hour)\nset_transient( 'my_key', $data, HOUR_IN_SECONDS );\n\n// Retrieve (returns false if expired/missing)\n$data = get_transient( 'my_key' );\nif ( false === $data ) {\n  $data = expensive_query();\n  set_transient( 'my_key', $data, HOUR_IN_SECONDS );\n}\n\n// Delete\ndelete_transient( 'my_key' );\n```\n\n**Time constants:** `MINUTE_IN_SECONDS` (60), `HOUR_IN_SECONDS` (3600), `DAY_IN_SECONDS` (86400), `WEEK_IN_SECONDS` (604800), `MONTH_IN_SECONDS` (2592000).\n\n**Key naming:** Prefix with plugin slug; use `md5( $url . serialize( $params ) )` for API-response keys.\n\n**Object cache integration:** On sites with Redis/Memcached, transients use the object cache and expiration is handled in-memory (faster). Always check `false === $cached` (not just `!$cached`) since stored `false` is rare but valid null is possible.\n\n**Cache invalidation:** Call `delete_transient()` when the underlying data changes (e.g. on `save_post`). Group related transients with a consistent prefix for bulk deletion."
+		},
+		{
+			"id": "metadata",
+			"title": "Metadata API — Post, User, Term Meta",
+			"uri": "wordpress://core/metadata",
+			"category": "core",
+			"keywords": ["meta", "post meta", "user meta", "term meta", "get_post_meta", "update_post_meta", "add_post_meta", "delete_post_meta", "get_user_meta", "update_user_meta", "get_term_meta", "update_term_meta", "meta_key", "meta_value", "custom field", "_prefix"],
+			"excerpt": "Meta functions follow the same pattern for posts, users, terms, and comments.\n\n**Post meta:**\n```php\nget_post_meta( $post_id, 'key', true );    // single value\nget_post_meta( $post_id, 'key', false );   // all values (array)\nupdate_post_meta( $post_id, 'key', $val ); // creates if not exists\nadd_post_meta( $post_id, 'key', $val );    // allows duplicates\ndelete_post_meta( $post_id, 'key' );\n```\n\n**User/term meta** use same pattern: `get_user_meta()`, `update_user_meta()`, `get_term_meta()` (WP 4.4+), `update_term_meta()`.\n\n**Private meta** (hidden from Custom Fields UI): prefix key with underscore, e.g. `_product_price`.\n\n**Storing arrays:** Pass array directly to `update_post_meta()`. WordPress serializes it. Retrieve and cast with `is_array()`.\n\n**Meta queries:**\n```php\nnew WP_Query( array(\n  'meta_key'     => '_featured',\n  'meta_value'   => '1',\n  'meta_compare' => '=',\n) );\n```\nUse `meta_query` array with `'relation' => 'AND'/'OR'` for complex queries.\n\n**Always sanitize** before `update_post_meta()`. Always use `wp_verify_nonce()` and `current_user_can()` in save hooks."
+		},
+		{
+			"id": "database",
+			"title": "WordPress Database API — wpdb",
+			"uri": "wordpress://core/database",
+			"category": "core",
+			"keywords": ["wpdb", "database", "SQL", "query", "prepare", "get_results", "get_row", "get_var", "insert", "update", "delete", "prefix", "wp_posts", "wp_postmeta", "wp_users", "wp_options", "dbDelta", "custom table", "$wpdb"],
+			"excerpt": "`global $wpdb` is the database interface. **Always use prepared statements.**\n\n```php\nglobal $wpdb;\n\n// Safe SELECT\n$rows = $wpdb->get_results( $wpdb->prepare(\n  \"SELECT * FROM {$wpdb->posts} WHERE post_author = %d AND post_status = %s\",\n  $author_id, 'publish'\n) );\n$row = $wpdb->get_row( $wpdb->prepare( \"SELECT * FROM {$wpdb->posts} WHERE ID = %d\", $id ) );\n$val = $wpdb->get_var( \"SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'post'\" );\n\n// INSERT / UPDATE / DELETE (auto-sanitized)\n$wpdb->insert( $wpdb->posts, array( 'post_title' => $t ), array( '%s' ) );\n$wpdb->update( $wpdb->posts, array( 'post_status' => 'draft' ), array( 'ID' => $id ), array( '%s' ), array( '%d' ) );\n$wpdb->delete( $wpdb->posts, array( 'ID' => $id ), array( '%d' ) );\n```\n\n**Placeholders:** `%d` integer, `%s` string, `%f` float. **Never concatenate user input.**\n\n**LIKE queries:** escape wildcards first with `$wpdb->esc_like( $search )` before passing to `prepare()`.\n\n**Custom tables:** Create with `dbDelta()` on activation. Always prefix: `$wpdb->prefix . 'my_table'`.\n\n**Common table properties:** `$wpdb->posts`, `$wpdb->postmeta`, `$wpdb->users`, `$wpdb->usermeta`, `$wpdb->options`, `$wpdb->terms`, `$wpdb->term_taxonomy`.\n\n**Prefer WordPress query functions** (`WP_Query`, `get_posts`, `get_users`) over raw SQL when possible."
+		},
+		{
+			"id": "http-api",
+			"title": "HTTP API — Remote Requests",
+			"uri": "wordpress://core/http",
+			"category": "core",
+			"keywords": ["http", "wp_remote_get", "wp_remote_post", "wp_remote_request", "wp_remote_retrieve_body", "wp_remote_retrieve_response_code", "is_wp_error", "WP_Error", "api", "request", "response", "fetch", "external", "wp_safe_remote_get", "timeout", "headers"],
+			"excerpt": "WordPress provides safe, transport-agnostic HTTP functions.\n\n```php\n// GET\n$response = wp_remote_get( 'https://api.example.com/data', array(\n  'timeout' => 15,\n  'headers' => array( 'Authorization' => 'Bearer ' . $token ),\n) );\n\nif ( is_wp_error( $response ) ) {\n  // handle error\n}\n$code = wp_remote_retrieve_response_code( $response );\n$body = wp_remote_retrieve_body( $response );\n$data = json_decode( $body, true );\n\n// POST\n$response = wp_remote_post( $url, array(\n  'body'    => wp_json_encode( $data ),\n  'headers' => array( 'Content-Type' => 'application/json' ),\n  'timeout' => 30,\n) );\n```\n\n**Helper functions:** `wp_remote_retrieve_header()`, `wp_remote_retrieve_headers()`, `wp_remote_retrieve_response_message()`.\n\n**For user-supplied URLs:** use `wp_safe_remote_get()` / `wp_safe_remote_post()` to block internal network requests.\n\n**Always check `is_wp_error()`** before reading the response.\n\n**Cache API responses** with transients: `set_transient( $cache_key, $data, HOUR_IN_SECONDS )`.\n\n**Default timeout is 5 seconds** — increase for slow APIs. Set `sslverify => false` only in local dev."
+		},
+		{
+			"id": "nonces",
+			"title": "Security Nonces — CSRF Protection",
+			"uri": "wordpress://security/nonces",
+			"category": "security",
+			"keywords": ["nonce", "nonces", "wp_nonce_field", "wp_create_nonce", "wp_verify_nonce", "check_admin_referer", "check_ajax_referer", "wp_nonce_url", "CSRF", "security", "form", "verify"],
+			"excerpt": "Nonces protect against CSRF by verifying request intent. They expire in ~24 hours.\n\n**In forms:**\n```php\n// Output nonce field\nwp_nonce_field( 'save_my_action', 'my_nonce_field' );\n\n// Verify on submit\nif ( ! isset( $_POST['my_nonce_field'] ) ||\n     ! wp_verify_nonce( $_POST['my_nonce_field'], 'save_my_action' ) ) {\n  wp_die( 'Security check failed' );\n}\n// Or: check_admin_referer( 'save_my_action', 'my_nonce_field' );\n```\n\n**In AJAX:**\n```php\n// PHP: localize nonce to JS\nwp_localize_script( 'my-script', 'MyAjax', array(\n  'nonce' => wp_create_nonce( 'my_ajax_nonce' ),\n) );\n\n// PHP: verify in handler\nadd_action( 'wp_ajax_my_action', 'my_handler' );\nfunction my_handler() {\n  check_ajax_referer( 'my_ajax_nonce', 'nonce' );\n  // ...\n  wp_send_json_success( $data );\n}\n```\n\n**URL nonce:** `wp_nonce_url( $url, 'action_name' )` — verify with `check_admin_referer( 'action_name' )`.\n\n**Important:** Nonces are NOT a permissions check — always also call `current_user_can()`. Never cache pages containing nonces."
+		},
+		{
+			"id": "sanitization",
+			"title": "Data Sanitization — Cleaning Input",
+			"uri": "wordpress://security/sanitization",
+			"category": "security",
+			"keywords": ["sanitize", "sanitization", "sanitize_text_field", "sanitize_email", "sanitize_url", "wp_kses", "wp_kses_post", "absint", "intval", "sanitize_textarea_field", "sanitize_key", "sanitize_title", "sanitize_file_name", "array_map", "input", "clean"],
+			"excerpt": "**Sanitize before storing.** Use the most specific function for each data type.\n\n| Data type | Function |\n|---|---|\n| Short text | `sanitize_text_field( $val )` |\n| Multi-line text | `sanitize_textarea_field( $val )` |\n| Email | `sanitize_email( $val )` |\n| URL (db storage) | `esc_url_raw( $val )` |\n| Positive integer | `absint( $val )` |\n| Integer | `intval( $val )` |\n| Float | `floatval( $val )` |\n| Slug/key | `sanitize_key( $val )` |\n| File name | `sanitize_file_name( $val )` |\n| HTML with allowed tags | `wp_kses( $val, $allowed )` |\n| Post-level HTML | `wp_kses_post( $val )` |\n| Strip all HTML | `wp_strip_all_tags( $val )` |\n\n**Whitelist select/radio values:**\n```php\n$allowed = array( 'draft', 'publish', 'private' );\n$status = in_array( $status, $allowed, true ) ? $status : 'draft';\n```\n\n**Array sanitization:**\n`$clean = array_map( 'sanitize_text_field', $_POST['items'] );`\n\n**Flow:** `nonce check → capability check → sanitize → validate → store → escape on output`."
+		},
+		{
+			"id": "escaping",
+			"title": "Output Escaping — Preventing XSS",
+			"uri": "wordpress://security/escaping",
+			"category": "security",
+			"keywords": ["escape", "escaping", "esc_html", "esc_attr", "esc_url", "esc_js", "esc_textarea", "wp_kses_post", "wp_json_encode", "XSS", "output", "esc_html_e", "esc_attr_e", "esc_html__", "esc_attr__", "html", "attribute"],
+			"excerpt": "**Always escape late — at the point of output, not storage.**\n\n| Context | Function | Example |\n|---|---|---|\n| HTML content | `esc_html()` | `echo esc_html( $title );` |\n| HTML attribute | `esc_attr()` | `value=\"<?php echo esc_attr( $val ); ?>\"` |\n| URL in href/src | `esc_url()` | `href=\"<?php echo esc_url( $link ); ?>\"` |\n| JavaScript | `esc_js()` | `var x = '<?php echo esc_js( $val ); ?>';` |\n| Textarea | `esc_textarea()` | `<textarea><?php echo esc_textarea( $val ); ?>` |\n| Rich HTML | `wp_kses_post()` | `echo wp_kses_post( $content );` |\n| JSON for JS | `wp_json_encode()` | `var c = <?php echo wp_json_encode( $arr ); ?>;` |\n\n**i18n + escaping:**\n- `esc_html_e( 'Text', 'domain' )` — echo escaped translated string\n- `esc_html__( 'Text', 'domain' )` — return escaped translated string\n- `esc_attr_e()` / `esc_attr__()` for attributes\n\n**Never double-escape.** Escape only at output, not when storing. Use `wp_localize_script()` for passing PHP data to JavaScript — it handles encoding automatically."
+		},
+		{
+			"id": "capabilities",
+			"title": "User Capabilities & Roles",
+			"uri": "wordpress://security/capabilities",
+			"category": "security",
+			"keywords": ["capability", "capabilities", "role", "roles", "current_user_can", "user_can", "manage_options", "edit_posts", "publish_posts", "administrator", "editor", "author", "contributor", "subscriber", "add_role", "get_role", "add_cap", "remove_cap", "map_meta_cap"],
+			"excerpt": "**Check before every sensitive operation.**\n\n```php\n// Check current user\nif ( current_user_can( 'manage_options' ) ) { ... }\nif ( current_user_can( 'edit_post', $post_id ) ) { ... } // object-level\n\n// Check specific user\nif ( user_can( $user_id, 'publish_posts' ) ) { ... }\n```\n\n**Built-in roles (ascending):** Subscriber → Contributor → Author → Editor → Administrator.\n\n**Key capabilities:** `read`, `edit_posts`, `edit_others_posts`, `publish_posts`, `delete_posts`, `manage_categories`, `upload_files`, `manage_options`, `activate_plugins`, `edit_theme_options`, `list_users`, `create_users`.\n\n**Add/remove capabilities:**\n```php\n$role = get_role( 'editor' );\n$role->add_cap( 'custom_capability' );\n$role->remove_cap( 'custom_capability' );\n```\n\n**Create custom role** (do once on activation):\n`add_role( 'reviewer', 'Reviewer', array( 'read' => true, 'edit_posts' => true ) );`\n`remove_role( 'reviewer' );` — on deactivation.\n\n**Best practice:** Check capabilities, not role names. Use specific caps over `administrator`."
+		},
+		{
+			"id": "sql-injection",
+			"title": "SQL Injection Prevention",
+			"uri": "wordpress://security/sql-injection",
+			"category": "security",
+			"keywords": ["sql injection", "prepare", "wpdb prepare", "placeholder", "sanitize", "%d", "%s", "%f", "WHERE IN", "esc_like", "LIKE", "SQL", "injection", "database security"],
+			"excerpt": "**Never concatenate user input into SQL. Always use `$wpdb->prepare()`.**\n\n```php\nglobal $wpdb;\n// ❌ NEVER\n$wpdb->query( \"SELECT * FROM {$wpdb->posts} WHERE ID = $id\" );\n\n// ✅ ALWAYS\n$wpdb->query( $wpdb->prepare(\n  \"SELECT * FROM {$wpdb->posts} WHERE ID = %d\",\n  $id\n) );\n```\n\n**Placeholders:** `%d` = integer, `%s` = string, `%f` = float.\n\n**LIKE queries** — escape wildcards first:\n```php\n$search = $wpdb->esc_like( $search );\n$wpdb->prepare( \"... WHERE title LIKE %s\", '%' . $search . '%' );\n```\n\n**WHERE IN with array:**\n```php\n$ids = array( 1, 2, 3 );\n$placeholders = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );\n$wpdb->prepare( \"SELECT * FROM {$wpdb->posts} WHERE ID IN ($placeholders)\", ...$ids );\n```\n\n**ORDER BY / LIMIT** cannot use prepare() placeholders — whitelist allowed values instead:\n`$order = ( 'asc' === strtolower( $order ) ) ? 'ASC' : 'DESC';`\n\n**Prefer** `WP_Query`, `get_posts()`, `get_users()` when available — WordPress handles sanitization internally."
+		},
+		{
+			"id": "rest-api",
+			"title": "REST API — Custom Endpoints",
+			"uri": "wordpress://rest-api/custom-endpoints",
+			"category": "rest-api",
+			"keywords": ["REST API", "rest", "register_rest_route", "WP_REST_Request", "WP_REST_Response", "rest_ensure_response", "WP_Error", "permission_callback", "rest_api_init", "endpoint", "route", "namespace", "GET", "POST", "PUT", "DELETE", "sanitize_callback", "validate_callback", "schema"],
+			"excerpt": "Register routes in the `rest_api_init` hook:\n\n```php\nadd_action( 'rest_api_init', function() {\n  register_rest_route( 'myplugin/v1', '/items', array(\n    'methods'             => 'GET',\n    'callback'            => 'get_items',\n    'permission_callback' => function() {\n      return current_user_can( 'edit_posts' );\n    },\n    'args' => array(\n      'id' => array(\n        'required'          => true,\n        'sanitize_callback' => 'absint',\n        'validate_callback' => function( $v ) { return is_numeric( $v ); },\n      ),\n    ),\n  ) );\n} );\n\nfunction get_items( $request ) {\n  $id = $request['id'];\n  $post = get_post( $id );\n  if ( ! $post ) {\n    return new WP_Error( 'not_found', 'Not found', array( 'status' => 404 ) );\n  }\n  return rest_ensure_response( array( 'id' => $post->ID, 'title' => $post->post_title ) );\n}\n```\n\n**URL patterns:** `(?P<id>\\d+)` captures `id` from URL path.\n\n**Methods:** `WP_REST_Server::READABLE` (GET), `WP_REST_Server::CREATABLE` (POST), `WP_REST_Server::EDITABLE` (PUT/PATCH), `WP_REST_Server::DELETABLE` (DELETE).\n\n**Never use `'__return_true'` as `permission_callback` in production.** Always return a proper boolean or `WP_Error` from permission callbacks.\n\n**Auth for logged-in users** (JS): send `X-WP-Nonce` header with `wp_create_nonce( 'wp_rest' )`."
+		},
+		{
+			"id": "rest-auth",
+			"title": "REST API Authentication",
+			"uri": "wordpress://rest-api/authentication",
+			"category": "rest-api",
+			"keywords": ["REST authentication", "application password", "nonce", "X-WP-Nonce", "wp_rest nonce", "cookie authentication", "JWT", "OAuth", "Authorization header", "Basic auth", "wp_create_nonce", "is_user_logged_in"],
+			"excerpt": "**Three main authentication methods:**\n\n**1. Cookie + Nonce** (for JS on the same site — most common):\n```php\n// PHP: pass nonce to JS\nwp_add_inline_script( 'my-script',\n  'window.myNonce = ' . wp_json_encode( wp_create_nonce( 'wp_rest' ) ) . ';', 'before'\n);\n```\n```js\n// JS: include in requests\nfetch( '/wp-json/myplugin/v1/data', {\n  headers: { 'X-WP-Nonce': window.myNonce }\n} );\n```\n\n**2. Application Passwords** (WP 5.6+ — for external apps/scripts):\nUser generates in profile → `Settings > Security`. Send as Basic Auth:\n`Authorization: Basic base64(username:app_password)`\n\n**3. WP REST Nonce** for `wp.apiFetch` (block editor):\n`wp.apiFetch` automatically includes the nonce via `wpApiSettings.nonce`.\n\n**Permission callback pattern** for authenticated endpoints:\n```php\n'permission_callback' => function( $request ) {\n  return is_user_logged_in() && current_user_can( 'edit_posts' );\n}\n```\n\n**Rate limiting:** Use transients to track request counts per IP/user. Return `WP_Error` with status 429 when exceeded."
+		},
+		{
+			"id": "ajax",
+			"title": "AJAX Development",
+			"uri": "wordpress://advanced/ajax-development",
+			"category": "advanced",
+			"keywords": ["ajax", "wp_ajax", "wp_ajax_nopriv", "admin-ajax.php", "wp_send_json_success", "wp_send_json_error", "wp_localize_script", "check_ajax_referer", "ajaxurl", "jQuery.ajax", "fetch", "nonce", "action"],
+			"excerpt": "WordPress AJAX uses `admin-ajax.php` as the handler endpoint.\n\n**PHP: Register handler + localize nonce:**\n```php\nadd_action( 'wp_ajax_my_action', 'my_ajax_handler' );         // logged-in users\nadd_action( 'wp_ajax_nopriv_my_action', 'my_ajax_handler' ); // guests\n\nfunction my_ajax_handler() {\n  check_ajax_referer( 'my_nonce', 'nonce' );\n  if ( ! current_user_can( 'edit_posts' ) ) {\n    wp_send_json_error( 'Unauthorized', 403 );\n  }\n  $data = sanitize_text_field( $_POST['data'] ?? '' );\n  // ... process ...\n  wp_send_json_success( array( 'result' => $data ) );\n}\n\nwp_localize_script( 'my-script', 'MyAjax', array(\n  'url'   => admin_url( 'admin-ajax.php' ),\n  'nonce' => wp_create_nonce( 'my_nonce' ),\n) );\n```\n\n**JS:**\n```js\njQuery.post( MyAjax.url, {\n  action: 'my_action',\n  nonce:  MyAjax.nonce,\n  data:   'value'\n}, function( res ) {\n  if ( res.success ) { console.log( res.data ); }\n} );\n```\n\n**Modern alternative:** Use the REST API (`register_rest_route`) for new features — better schema, auth, and response handling.\n\n**Always** end AJAX handlers with `wp_die()` or `wp_send_json_*()`."
+		},
+		{
+			"id": "cron",
+			"title": "WordPress Cron — Scheduled Tasks",
+			"uri": "wordpress://advanced/wordpress-cron",
+			"category": "advanced",
+			"keywords": ["cron", "wp-cron", "wp_schedule_event", "wp_schedule_single_event", "wp_next_scheduled", "wp_clear_scheduled_hook", "cron_schedules", "scheduled", "background", "recurring", "daily", "hourly", "weekly", "deactivation hook"],
+			"excerpt": "WordPress cron is triggered by page visits — not a real system cron.\n\n**Schedule recurring event:**\n```php\n// Register on init (or activation)\nif ( ! wp_next_scheduled( 'my_daily_task' ) ) {\n  wp_schedule_event( time(), 'daily', 'my_daily_task' );\n}\n// Handle\nadd_action( 'my_daily_task', 'do_daily_task' );\nfunction do_daily_task() { /* ... */ }\n// Clean up on deactivation (REQUIRED)\nregister_deactivation_hook( __FILE__, function() {\n  wp_clear_scheduled_hook( 'my_daily_task' );\n} );\n```\n\n**One-time event:**\n`wp_schedule_single_event( time() + 3600, 'my_one_time_event' );`\n\n**Custom intervals** (add to `cron_schedules` filter):\n```php\nadd_filter( 'cron_schedules', function( $s ) {\n  $s['every_15_minutes'] = array( 'interval' => 900, 'display' => 'Every 15 Minutes' );\n  return $s;\n} );\n```\n\n**Built-in intervals:** `hourly`, `twicedaily`, `daily`, `weekly`.\n\n**Check next run:** `wp_next_scheduled( 'hook_name' )` returns timestamp or false.\n\n**For reliable/time-critical tasks** on high-traffic sites: disable wp-cron (`DISABLE_WP_CRON`) and set up a real system cron calling `wp-cron.php`."
+		},
+		{
+			"id": "settings-api",
+			"title": "Settings API",
+			"uri": "wordpress://core/settings",
+			"category": "core",
+			"keywords": ["settings", "settings api", "register_setting", "add_settings_section", "add_settings_field", "settings_fields", "do_settings_sections", "options_page", "add_options_page", "add_menu_page", "sanitize_callback", "options group", "admin page"],
+			"excerpt": "The Settings API registers options, creates settings pages, and handles sanitization with nonce protection automatically.\n\n**Three-part pattern:**\n\n```php\n// 1. Register setting + sanitize callback\nregister_setting( 'my_group', 'my_option', array(\n  'sanitize_callback' => 'sanitize_my_option',\n) );\n\n// 2. Add section + fields (in admin_init)\nadd_settings_section( 'main', 'Main Settings', '__return_false', 'my-page' );\nadd_settings_field( 'api_key', 'API Key', 'render_api_key_field', 'my-page', 'main' );\n\nfunction render_api_key_field() {\n  $val = get_option( 'my_option', '' );\n  echo '<input name=\"my_option\" value=\"' . esc_attr( $val ) . '\">';\n}\n\n// 3. Render the page (wrap in a form pointing to options.php)\nfunction render_settings_page() {\n  if ( ! current_user_can( 'manage_options' ) ) return;\n  ?><div class=\"wrap\">\n    <h1>Settings</h1>\n    <form method=\"post\" action=\"options.php\">\n      <?php settings_fields( 'my_group' ); ?>\n      <?php do_settings_sections( 'my-page' ); ?>\n      <?php submit_button(); ?>\n    </form>\n  </div><?php\n}\n```\n\n`settings_fields()` outputs the nonce, action field, and option page field automatically. Data is submitted to `options.php` and saved via the `sanitize_callback`."
+		},
+		{
+			"id": "meta-boxes",
+			"title": "Meta Boxes",
+			"uri": "wordpress://advanced/meta-boxes",
+			"category": "advanced",
+			"keywords": ["meta box", "meta_box", "add_meta_box", "add_meta_boxes", "save_post", "get_post_meta", "update_post_meta", "wp_nonce_field", "wp_verify_nonce", "DOING_AUTOSAVE", "current_user_can", "render callback", "context", "priority"],
+			"excerpt": "Meta boxes add custom fields to the post editor.\n\n```php\n// Register\nadd_action( 'add_meta_boxes', function() {\n  add_meta_box(\n    'my_meta_box',     // ID\n    'Extra Details',   // Title\n    'render_meta_box', // Callback\n    'post',            // Post type (or array)\n    'normal',          // Context: normal | side | advanced\n    'high'             // Priority: high | core | default | low\n  );\n} );\n\n// Render\nfunction render_meta_box( $post ) {\n  wp_nonce_field( 'save_meta', 'my_nonce' );\n  $value = get_post_meta( $post->ID, '_my_field', true );\n  echo '<input name=\"my_field\" value=\"' . esc_attr( $value ) . '\">';\n}\n\n// Save\nadd_action( 'save_post', function( $post_id ) {\n  if ( ! isset( $_POST['my_nonce'] ) || ! wp_verify_nonce( $_POST['my_nonce'], 'save_meta' ) ) return;\n  if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;\n  if ( ! current_user_can( 'edit_post', $post_id ) ) return;\n\n  update_post_meta( $post_id, '_my_field',\n    sanitize_text_field( $_POST['my_field'] ?? '' )\n  );\n} );\n```\n\n**Block editor note:** Meta boxes still work in Gutenberg but `register_meta()` with `show_in_rest => true` is the modern approach for block-editor-aware sidebar panels."
+		},
+		{
+			"id": "performance",
+			"title": "Performance Optimization",
+			"uri": "wordpress://advanced/performance-optimization",
+			"category": "advanced",
+			"keywords": ["performance", "caching", "transient", "object cache", "page cache", "query optimization", "database optimization", "lazy loading", "defer", "async", "CDN", "revisions", "wp_revisions_to_keep", "no_found_rows", "posts_per_page", "SAVEQUERIES", "OPcache"],
+			"excerpt": "**Database query optimizations:**\n- Use `'no_found_rows' => true` in `WP_Query` when you don't need pagination.\n- Avoid `meta_query` on large tables; add MySQL indexes on custom meta keys.\n- Limit `posts_per_page` — never use `-1` on large datasets without caching.\n- Use `get_var()` / `get_col()` instead of `get_results()` when only one value is needed.\n- Enable `SAVEQUERIES` in dev to identify slow queries with `$wpdb->queries`.\n\n**Caching patterns:**\n```php\n// Object cache (request-level)\nwp_cache_set( 'key', $data, 'group', 3600 );\n$data = wp_cache_get( 'key', 'group' );\n\n// Persistent (transients)\nset_transient( 'expensive_query', $data, HOUR_IN_SECONDS );\n```\n\n**Asset loading:**\n- Use `wp_enqueue_scripts` correctly with dependencies array.\n- Add `defer`/`async` via `script_loader_tag` filter.\n- Remove unused scripts: `wp_dequeue_script( 'wp-embed' )`.\n- Limit post revisions: `define( 'WP_POST_REVISIONS', 5 )`.\n\n**WordPress config:** Enable OPcache (PHP), use Redis/Memcached for object cache, HTTP/2 on server, and a proper page caching plugin (LiteSpeed Cache, W3 Total Cache)."
+		},
+		{
+			"id": "template-hierarchy",
+			"title": "Template Hierarchy",
+			"uri": "wordpress://themes/template-hierarchy",
+			"category": "themes",
+			"keywords": ["template", "template hierarchy", "single.php", "archive.php", "page.php", "index.php", "category.php", "tag.php", "taxonomy.php", "author.php", "search.php", "404.php", "singular.php", "home.php", "front-page.php", "is_single", "is_page", "is_archive", "is_category", "locate_template", "get_template_part"],
+			"excerpt": "WordPress looks for the most specific template and falls back to more general ones.\n\n**Single post:** `single-{type}-{slug}.php` → `single-{type}.php` → `single.php` → `singular.php` → `index.php`\n\n**Pages:** (custom template) → `page-{slug}.php` → `page-{id}.php` → `page.php` → `singular.php` → `index.php`\n\n**Archive:** `archive-{post_type}.php` → `archive.php` → `index.php`\n\n**Category:** `category-{slug}.php` → `category-{id}.php` → `category.php` → `archive.php` → `index.php`\n\n**Custom taxonomy:** `taxonomy-{tax}-{term}.php` → `taxonomy-{tax}.php` → `taxonomy.php` → `archive.php` → `index.php`\n\n**Other:** `search.php`, `404.php`, `attachment.php`, `author.php`, `date.php` — all fall back to `index.php`.\n\n**Conditional tags:** `is_single()`, `is_page()`, `is_archive()`, `is_category()`, `is_tax()`, `is_home()`, `is_front_page()`, `is_search()`, `is_404()`, `is_singular( 'product' )`.\n\n**Template parts:** `get_template_part( 'template-parts/content', get_post_format() )`.\n\n**Override template programmatically:** Use `template_include` filter."
+		},
+		{
+			"id": "wp-cli",
+			"title": "WP-CLI — Command Line Interface",
+			"uri": "wordpress://tools/wp-cli",
+			"category": "tools",
+			"keywords": ["wp-cli", "wp cli", "WP-CLI", "wp plugin", "wp theme", "wp post", "wp user", "wp db", "wp core", "wp option", "wp transient", "wp search-replace", "wp cache", "wp eval", "wp cron", "command line", "terminal", "shell", "automation", "deployment"],
+			"excerpt": "WP-CLI is the command-line tool for managing WordPress.\n\n**Common commands:**\n```bash\n# Core\nwp core update && wp core update-db\n\n# Plugins / Themes\nwp plugin list --status=active\nwp plugin install query-monitor --activate\nwp plugin update --all\nwp theme activate twentytwentyfive\n\n# Content\nwp post list --post_type=post --post_status=publish\nwp post create --post_title='New Post' --post_status=publish\nwp post delete 123 --force\n\n# Users\nwp user list --role=administrator\nwp user update 1 --user_pass='newpassword'\n\n# Database\nwp db export backup.sql\nwp db import backup.sql\nwp search-replace 'old-domain.com' 'new-domain.com' --dry-run\nwp db optimize\n\n# Options / Transients\nwp option get siteurl\nwp option update blogname 'My Site'\nwp transient delete --all\n\n# Cache\nwp cache flush\n\n# Eval\nwp eval \"echo get_option('siteurl');\"\n\n# Cron\nwp cron event list\nwp cron event run my_hook\n```\n\n**Useful flags:** `--path=/var/www/html` (specify WP dir), `--allow-root`, `--format=json`, `--dry-run`, `--skip-plugins`."
+		},
+		{
+			"id": "block-development",
+			"title": "Block Development — Gutenberg / Block Editor",
+			"uri": "wordpress://blocks/block-registration",
+			"category": "blocks",
+			"keywords": ["block", "blocks", "Gutenberg", "block editor", "registerBlockType", "block.json", "edit", "save", "InspectorControls", "BlockControls", "useBlockProps", "attributes", "dynamic block", "render_callback", "InnerBlocks", "register_block_type", "@wordpress/blocks", "block pattern", "block variation"],
+			"excerpt": "**Register a block via block.json (recommended):**\n```json\n{\n  \"$schema\": \"https://schemas.wp.org/trunk/block.json\",\n  \"apiVersion\": 3,\n  \"name\": \"myplugin/my-block\",\n  \"title\": \"My Block\",\n  \"category\": \"text\",\n  \"editorScript\": \"file:./build/index.js\",\n  \"attributes\": {\n    \"message\": { \"type\": \"string\", \"default\": \"Hello\" }\n  }\n}\n```\n```php\nadd_action( 'init', function() {\n  register_block_type( __DIR__ . '/blocks/my-block' );\n} );\n```\n\n**JavaScript edit/save:**\n```js\nimport { registerBlockType } from '@wordpress/blocks';\nimport { useBlockProps, InspectorControls } from '@wordpress/block-editor';\nregisterBlockType( 'myplugin/my-block', {\n  edit: ( { attributes, setAttributes } ) => (\n    <div {...useBlockProps()}>\n      <input value={attributes.message}\n             onChange={e => setAttributes({ message: e.target.value })} />\n    </div>\n  ),\n  save: ( { attributes } ) => (\n    <div {...useBlockProps.save()}>{attributes.message}</div>\n  ),\n} );\n```\n\n**Dynamic blocks:** set `render_callback` in PHP and return `null` from `save()`. `InnerBlocks` allows nested blocks. Use `InspectorControls` for sidebar panel settings."
+		},
+		{
+			"id": "block-themes",
+			"title": "Block Themes — Full Site Editing (FSE)",
+			"uri": "wordpress://themes/block-themes",
+			"category": "themes",
+			"keywords": ["block theme", "full site editing", "FSE", "templates", "template parts", "theme.json", "template-parts", "parts", "HTML templates", "wp:query", "wp:post-template", "wp:template-part", "block patterns", "synced patterns", "site editor", "WordPress 5.9"],
+			"excerpt": "Block themes use HTML files with block markup instead of PHP templates (WP 5.9+).\n\n**File structure:**\n```\nmy-theme/\n├── style.css       (theme header)\n├── theme.json      (global settings/styles)\n├── templates/\n│   ├── index.html\n│   ├── single.html\n│   ├── page.html\n│   └── archive.html\n└── parts/\n    ├── header.html\n    └── footer.html\n```\n\n**Template uses block markup:**\n```html\n<!-- wp:template-part {\"slug\":\"header\",\"tagName\":\"header\"} /-->\n<!-- wp:group {\"layout\":{\"type\":\"constrained\"}} -->\n<div class=\"wp-block-group\">\n  <!-- wp:post-content /-->\n</div>\n<!-- /wp:group -->\n<!-- wp:template-part {\"slug\":\"footer\",\"tagName\":\"footer\"} /-->\n```\n\n**Register template parts** in theme.json `templateParts` array.\n\n**Register block patterns in PHP:**\n`register_block_pattern( 'theme/hero', array( 'title' => 'Hero', 'content' => '...' ) );`\n\n**Register custom block styles:**\n`register_block_style( 'core/button', array( 'name' => 'outline', 'label' => 'Outline' ) );`\n\nThe Site Editor (`Appearance > Editor`) lets users customize templates directly."
+		},
+		{
+			"id": "theme-json",
+			"title": "theme.json — Block Theme Configuration",
+			"uri": "wordpress://themes/theme-json",
+			"category": "themes",
+			"keywords": ["theme.json", "theme json", "settings", "styles", "color palette", "typography", "font sizes", "font families", "spacing", "CSS variables", "wp--preset--color", "wp--preset--font-size", "blocks settings", "global styles", "templateParts", "appearanceTools"],
+			"excerpt": "theme.json is the central config for block themes — defines design tokens, global styles, and per-block settings.\n\n```json\n{\n  \"$schema\": \"https://schemas.wp.org/trunk/theme.json\",\n  \"version\": 3,\n  \"settings\": {\n    \"appearanceTools\": true,\n    \"color\": {\n      \"palette\": [\n        { \"slug\": \"primary\", \"color\": \"#0073aa\", \"name\": \"Primary\" },\n        { \"slug\": \"white\",   \"color\": \"#ffffff\", \"name\": \"White\" }\n      ]\n    },\n    \"typography\": {\n      \"fontSizes\": [\n        { \"slug\": \"small\",  \"size\": \"14px\", \"name\": \"Small\" },\n        { \"slug\": \"medium\", \"size\": \"16px\", \"name\": \"Medium\" },\n        { \"slug\": \"large\",  \"size\": \"20px\", \"name\": \"Large\" }\n      ]\n    }\n  },\n  \"styles\": {\n    \"color\": { \"background\": \"var(--wp--preset--color--white)\" },\n    \"typography\": { \"fontSize\": \"var(--wp--preset--font-size--medium)\" },\n    \"blocks\": {\n      \"core/button\": {\n        \"color\": { \"background\": \"var(--wp--preset--color--primary)\" }\n      }\n    }\n  }\n}\n```\n\n**CSS variables** are auto-generated: `--wp--preset--color--{slug}`, `--wp--preset--font-size--{slug}`, `--wp--preset--spacing--{slug}`.\n\n`appearanceTools: true` enables margin, padding, border, and link color controls for all blocks."
+		},
+		{
+			"id": "plugin-structure",
+			"title": "Plugin File Structure & Best Practices",
+			"uri": "wordpress://plugins/structure",
+			"category": "plugins",
+			"keywords": ["plugin structure", "plugin", "plugin file", "plugin header", "Plugin Name", "Text Domain", "ABSPATH", "define", "plugin_dir_path", "plugin_dir_url", "register_activation_hook", "register_deactivation_hook", "uninstall.php", "prefix", "namespace", "autoload"],
+			"excerpt": "**Required plugin header:**\n```php\n<?php\n/**\n * Plugin Name: My Plugin\n * Version: 1.0.0\n * Requires at least: 6.5\n * Requires PHP: 8.1\n * Text Domain: my-plugin\n * Domain Path: /languages\n */\ndefined( 'ABSPATH' ) || exit;\n```\n\n**Define constants** for paths and version:\n```php\ndefine( 'MY_PLUGIN_VERSION', '1.0.0' );\ndefine( 'MY_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );\ndefine( 'MY_PLUGIN_URL', plugin_dir_url( __FILE__ ) );\n```\n\n**Activation / deactivation hooks:**\n```php\nregister_activation_hook( __FILE__, 'my_plugin_activate' );\nregister_deactivation_hook( __FILE__, 'my_plugin_deactivate' );\n```\n\n**Uninstall:** Use `uninstall.php` (check `WP_UNINSTALL_PLUGIN` is defined). Remove options, meta, and custom tables.\n\n**Recommended structure:** `includes/` for PHP classes, `admin/` for admin views/assets, `public/` for frontend assets, `languages/` for translation files.\n\n**Prefix everything** — functions, classes, options, hooks — with a unique slug to avoid conflicts. Use OOP classes to encapsulate logic and avoid polluting the global namespace."
+		},
+		{
+			"id": "wp-debug",
+			"title": "WordPress Debugging",
+			"uri": "wordpress://tools/wp-debug",
+			"category": "tools",
+			"keywords": ["debug", "WP_DEBUG", "WP_DEBUG_LOG", "WP_DEBUG_DISPLAY", "SCRIPT_DEBUG", "SAVEQUERIES", "debug.log", "error_log", "wp-content/debug.log", "error handling", "Query Monitor", "debugging"],
+			"excerpt": "**wp-config.php debug constants:**\n```php\n// Development setup\ndefine( 'WP_DEBUG', true );         // Enable error reporting\ndefine( 'WP_DEBUG_LOG', true );     // Log to wp-content/debug.log\ndefine( 'WP_DEBUG_DISPLAY', false ); // Hide from visitors\ndefine( 'SCRIPT_DEBUG', true );     // Load unminified JS/CSS\ndefine( 'SAVEQUERIES', true );      // Save queries to $wpdb->queries\n```\n\n**Production:** Set `WP_DEBUG` and `WP_DEBUG_DISPLAY` to `false`. Can keep `WP_DEBUG_LOG => true` if monitoring.\n\n**Read the log:**\n`tail -f wp-content/debug.log` — or via WP-CLI: `wp eval \"echo file_get_contents( WP_CONTENT_DIR . '/debug.log' );\"`\n\n**Log from code:**\n`error_log( 'My value: ' . print_r( $data, true ) );`\n\n**Query profiling:**\n```php\nglobal $wpdb;\nerror_log( count( $wpdb->queries ) . ' queries' );\nerror_log( timer_stop() . 's load time' );\n```\n\n**Query Monitor plugin** is the best tool for live debugging: shows all DB queries, hooks fired, HTTP requests, template loaded, and PHP errors with context. Install with `wp plugin install query-monitor --activate`."
+		},
+		{
+			"id": "php-standards",
+			"title": "WordPress PHP Coding Standards",
+			"uri": "wordpress://standards/php",
+			"category": "standards",
+			"keywords": ["coding standards", "PHP standards", "WPCS", "phpcs", "naming", "tabs", "indentation", "function naming", "class naming", "yoda conditions", "DocBlock", "PHPDoc", "prefix", "early return", "strict comparison"],
+			"excerpt": "**Naming conventions:**\n- Variables/functions: `lowercase_with_underscores` — always prefix: `myplugin_get_data()`\n- Classes: `My_Plugin_Class` (capitalized words separated by underscores)\n- Constants: `MY_PLUGIN_VERSION` (uppercase)\n- Hooks: `myplugin_after_save` (prefix + descriptive name)\n\n**Formatting:**\n- **Tabs** for indentation (not spaces)\n- Space inside parentheses: `if ( $condition )`, `array( 'key' => 'val' )`\n- No space after function name: `my_function( $arg )` not `my_function ( $arg )`\n- Opening brace on same line: `if ( $x ) {`\n\n**Best practices:**\n- Use `array()` syntax (not `[]`) for compatibility\n- Strict comparisons: `===`, `in_array( $v, $arr, true )`\n- Yoda conditions optional but consistent: `if ( 'value' === $var )`\n- Early returns over deep nesting\n- Never use short PHP tags (`<?` or `<?=`)\n- Always `defined( 'ABSPATH' ) || exit;` at top of each file\n\n**PHPDoc all public functions:**\n```php\n/**\n * Get posts by taxonomy.\n *\n * @param string $taxonomy Taxonomy name.\n * @param string $term     Term slug.\n * @return WP_Post[]\n */\n```\n\n**Automated checking:** Install `wp-coding-standards/wpcs` and run `phpcs --standard=WordPress my-plugin/`."
+		},
+		{
+			"id": "rewrite-api",
+			"title": "Rewrite API — Custom URLs & Query Vars",
+			"uri": "wordpress://core/rewrite",
+			"category": "core",
+			"keywords": ["rewrite", "rewrite rules", "add_rewrite_rule", "add_rewrite_endpoint", "flush_rewrite_rules", "query_vars", "get_query_var", "custom URL", "permalink", "slug", "pretty URL", "endpoint"],
+			"excerpt": "The Rewrite API maps pretty URLs to WordPress query strings.\n\n**Add a custom rewrite rule:**\n```php\nadd_action( 'init', function() {\n  // Map /products/slug/ to post type query\n  add_rewrite_rule(\n    '^products/([^/]+)/?$',\n    'index.php?post_type=product&name=$matches[1]',\n    'top'                 // 'top' = before WP rules, 'bottom' = after\n  );\n} );\n```\n\n**Register custom query variables:**\n```php\nadd_filter( 'query_vars', function( $vars ) {\n  $vars[] = 'my_custom_param';\n  return $vars;\n} );\n// Retrieve:\n$val = get_query_var( 'my_custom_param' );\n```\n\n**Flush rewrite rules** ONLY on activation/deactivation — not on every request:\n`register_activation_hook( __FILE__, 'flush_rewrite_rules' );`\n\n**Add endpoint** (appended to any URL):\n`add_rewrite_endpoint( 'api', EP_ALL );` — creates `/any-url/api/value/`.\n\n**Debug:** If URLs return 404 after adding rules, go to Settings → Permalinks and save (flushes rules). Check rules with `print_r( $GLOBALS['wp_rewrite']->rules );`"
+		},
+		{
+			"id": "data-validation",
+			"title": "Data Validation",
+			"uri": "wordpress://security/data-validation",
+			"category": "security",
+			"keywords": ["validation", "validate", "is_email", "is_numeric", "filter_var", "FILTER_VALIDATE_URL", "absint", "required", "whitelist", "regex", "preg_match", "file upload validation", "file size", "mime type", "WP_Error"],
+			"excerpt": "**Validation vs sanitization:** Validation *checks* data; sanitization *cleans* it. Validate after sanitizing.\n\n```php\n// Email\n$email = sanitize_email( $_POST['email'] );\nif ( ! is_email( $email ) ) { /* invalid */ }\n\n// URL\n$url = esc_url_raw( $_POST['url'] );\nif ( empty( $url ) ) { /* invalid */ }\n// Or: filter_var( $url, FILTER_VALIDATE_URL )\n\n// Integers\n$id = absint( $_POST['id'] );  // positive integer\nif ( $id < 1 ) { /* invalid */ }\n\n// Whitelist (for selects/radios)\n$allowed = array( 'draft', 'publish', 'private' );\nif ( ! in_array( $status, $allowed, true ) ) { /* invalid */ }\n\n// File upload\n$allowed_mime = array( 'image/jpeg', 'image/png', 'image/gif' );\n$finfo = new finfo( FILEINFO_MIME_TYPE );\nif ( ! in_array( $finfo->file( $tmp ), $allowed_mime, true ) ) { /* reject */ }\n```\n\n**REST API validation:**\n```php\n'args' => array(\n  'email' => array(\n    'type' => 'string',\n    'format' => 'email',  // auto-validates email format\n    'required' => true,\n  ),\n  'age' => array(\n    'type' => 'integer',\n    'minimum' => 1,\n    'maximum' => 120,\n  ),\n)\n```\n\n**Pattern:** nonce → capability → validate → sanitize → store → escape on output."
+		}
+	]
+}

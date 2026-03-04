@@ -27,6 +27,7 @@ require_once DEWEY_PLUGIN_DIR . 'includes/class-dewey-settings.php';
 require_once DEWEY_PLUGIN_DIR . 'includes/class-dewey-intent-router.php';
 require_once DEWEY_PLUGIN_DIR . 'includes/class-dewey-action-handler.php';
 require_once DEWEY_PLUGIN_DIR . 'includes/class-dewey-indexer.php';
+require_once DEWEY_PLUGIN_DIR . 'includes/class-dewey-knowledge.php';
 require_once DEWEY_PLUGIN_DIR . 'includes/class-dewey-engine.php';
 require_once DEWEY_PLUGIN_DIR . 'includes/class-dewey-rest-controller.php';
 

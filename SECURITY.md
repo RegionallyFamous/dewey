@@ -50,7 +50,8 @@ If you discover a vulnerability, report it privately to the maintainer before pu
   - `GET /status`
   - `POST /reindex`
   - `POST /confirm-action`
-- Query and status are editor-capable routes, while reindex and confirm-action are admin-only.
+  - `POST /execute-action`
+- Query and status are editor-capable routes, while reindex/confirm-action/execute-action are admin-only.
 
 ## Pre-Release Security Checklist
 

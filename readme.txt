@@ -52,6 +52,7 @@ Dewey runs in wp-admin for authenticated users with appropriate capabilities. Qu
 * Write actions: Dewey can now create draft posts and pages, list recent content, and propose trash/publish operations — all gated by the logged-in user's WordPress capabilities. Destructive actions require explicit confirmation before executing.
 * New REST endpoint `/dewey/v1/execute-action` with HMAC-signed tokens for confirmed content changes (trash, publish).
 * Intent router extended with action patterns for create/list/trash/publish recognized before AI is consulted.
+* WordPress Knowledge Pack: Dewey now has a bundled reference knowledge base covering core WordPress topics (hooks, CPTs, taxonomies, REST API, AJAX, security, cron, Options API, metadata, WP-CLI, block development, and more). When your question maps to a documented topic, relevant excerpts are injected into the AI prompt for more reliable answers.
 
 = 1.0.20 =
 * Navigation command suggestions: as you type in the Dewey panel, fuzzy-matched go-to chips appear for any wp-admin screen. Powered by Fuse.js client-side matching against a 40-command registry and dynamically scraped sidebar items. Works without an AI provider connected.
