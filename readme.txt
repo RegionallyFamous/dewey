@@ -4,7 +4,7 @@ Tags: ai, content search, admin assistant, writing assistant, knowledge base
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 1.0.18
+Stable tag: 1.0.19
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -46,6 +46,11 @@ No. Dewey retrieves relevant excerpts first and sends only the minimum context n
 Dewey runs in wp-admin for authenticated users with appropriate capabilities. Query/status routes are for editors, while maintenance actions like reindex are admin-only.
 
 == Changelog ==
+
+= 1.0.19 =
+* Retrieval resilience: no-hit archive lookups now trigger targeted refinement prompts with possible title suggestions instead of dead-end responses.
+* Search quality: added title-focused fallback matching, date-aware ranking bias, and taxonomy phrase weighting for tags/categories in indexed scoring.
+* Index health: status now exposes staleness and integrity signals, with automatic orphan cleanup and retrieval telemetry counters for ongoing quality monitoring.
 
 = 1.0.18 =
 * Patch release prep: version alignment and release packaging refresh.

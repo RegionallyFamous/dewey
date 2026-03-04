@@ -26,6 +26,8 @@ Built by [Regionally Famous](https://regionallyfamous.com).
 - Copy-to-clipboard, retry on error, and Alt+Shift+D keyboard shortcut.
 - Relative message timestamps that update live.
 - BM25-style indexed retrieval with AI-powered query expansion and automatic re-indexing on content changes.
+- Retrieval resilience features: title-focused fallback matching, date-aware ranking bias, and deterministic no-hit refinement prompts.
+- Index quality monitoring: status telemetry counters, staleness signals, and automatic orphan-entry integrity cleanup.
 - Tone, verbosity, and citation style settings wired into the AI prompt.
 - Dewey-voiced settings confirmations and error messages.
 - Server-side retrieval + generation pipeline built on WordPress 7.0 AI infrastructure.

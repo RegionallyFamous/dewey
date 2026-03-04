@@ -8,7 +8,7 @@ If you discover a vulnerability, report it privately to the maintainer before pu
 
 - Include affected version, attack path, proof of concept, and impact.
 
-## Current Security Controls (v1.0.18)
+## Current Security Controls (v1.0.19)
 
 - Direct access guards in PHP files (`defined( 'ABSPATH' ) || exit;`).
 - Strict settings sanitization/allowlisting in `Dewey_Settings`.
@@ -18,8 +18,10 @@ If you discover a vulnerability, report it privately to the maintainer before pu
 - Frontend prompt input normalization (control-char stripping and max-length guard).
 - Frontend submit throttling and bounded in-memory chat history.
 - Assistant system prompt sanitization at REST boundary before AI generation.
+- Admin-gated non-public indexing mode (draft/private indexing requires explicit opt-in).
 - REST route capability and nonce checks for query/status/reindex/confirm-action.
 - Per-route, per-user server-side rate limiting with 429 responses.
+- Index integrity checks with automatic orphan-entry cleanup and capped integrity reports.
 - Build/release preflight checks (lint, tests, docs consistency, security scan).
 - Release packaging hardening:
   - slug validation,
