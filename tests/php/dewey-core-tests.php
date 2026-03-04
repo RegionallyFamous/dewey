@@ -487,6 +487,14 @@ assert_true(
 	is_wp_error( $engine_error )
 );
 
+$engine_fast_path = Dewey_Engine::answer_question( 'thanks' );
+assert_true(
+	'Engine uses deterministic fast path for tiny social chatter',
+	is_array( $engine_fast_path ) &&
+		0 === count( $engine_fast_path['citations'] ?? array() ) &&
+		'' !== trim( (string) ( $engine_fast_path['answer'] ?? '' ) )
+);
+
 $engine_refine = Dewey_Engine::answer_question( 'Do we have any posts about onboarding?' );
 assert_true(
 	'Engine asks for refinement when archive lookup has no hits',
@@ -545,6 +553,23 @@ assert_true(
 		12 === (int) ( $sanitized_screen_context['stats']['total_plugins'] ?? 0 )
 );
 
+$sanitized_history = Dewey_REST_Controller::sanitize_history(
+	array(
+		array( 'role' => 'user', 'text' => str_repeat( 'A', 500 ) ),
+		array( 'role' => 'assistant', 'text' => 'ok' ),
+		array( 'role' => 'user', 'text' => 'q3' ),
+		array( 'role' => 'assistant', 'text' => 'a4' ),
+		array( 'role' => 'user', 'text' => 'q5' ),
+		array( 'role' => 'assistant', 'text' => 'a6' ),
+		array( 'role' => 'user', 'text' => 'q7 should be dropped' ),
+	)
+);
+assert_true(
+	'REST history sanitization enforces tighter turn and size caps',
+	6 === count( $sanitized_history ) &&
+		320 === strlen( (string) ( $sanitized_history[0]['text'] ?? '' ) )
+);
+
 $GLOBALS['dewey_test_wp_query_posts'] = array();
 $rest_query_refine = Dewey_REST_Controller::query(
 	new WP_REST_Request(
@@ -597,7 +622,9 @@ assert_true(
 	is_array( $status_response ) &&
 		true === ( $status_response['index_health']['is_stale'] ?? false ) &&
 		is_array( $status_response['telemetry'] ?? null ) &&
-		is_array( $status_response['integrity'] ?? null )
+		is_array( $status_response['integrity'] ?? null ) &&
+		array_key_exists( 'prompt_chars_total', $status_response['telemetry'] ) &&
+		array_key_exists( 'fast_path_responses', $status_response['telemetry'] )
 );
 
 $eval_fixture_path = __DIR__ . '/../evals/retrieval-evals.json';

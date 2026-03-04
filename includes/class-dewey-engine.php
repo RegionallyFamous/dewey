@@ -12,6 +12,9 @@ defined( 'ABSPATH' ) || exit;
 
 final class Dewey_Engine {
 	const QUERY_TELEMETRY_OPTION_KEY = 'dewey_query_telemetry';
+	private const MAX_HISTORY_TURNS = 6;
+	private const MAX_HISTORY_CHARS = 320;
+	private const MAX_CONTEXT_BLOCKS = 4;
 
 	/**
 	 * @param string                              $question
@@ -26,6 +29,30 @@ final class Dewey_Engine {
 		$question = trim( wp_strip_all_tags( $question ) );
 		if ( '' === $question ) {
 			return new WP_Error( 'dewey_invalid_question', 'Question cannot be empty.', array( 'status' => 400 ) );
+		}
+
+		$fast_path = self::deterministic_fast_path_answer( $question );
+		if ( '' !== $fast_path ) {
+			self::record_query_telemetry(
+				array(
+					'total_queries'        => 1,
+					'fast_path_responses'  => 1,
+					'retrieval_hits'       => 0,
+					'retrieval_misses'     => 0,
+					'full_generation_runs' => 0,
+				)
+			);
+			return array(
+				'answer'     => $fast_path,
+				'follow_ups' => array(),
+				'citations'  => array(),
+				'meta'       => array(
+					'retrieval_mode' => 'none',
+					'result_count'   => 0,
+					'provider'       => '',
+					'model'          => '',
+				),
+			);
 		}
 
 		$intent_router = new Dewey_Intent_Router();
@@ -55,7 +82,11 @@ final class Dewey_Engine {
 			return self::apply_non_confirm_settings_intent( $intent );
 		}
 
-		$retrieval = self::retrieve_context( $question, $screen_context );
+		$retrieval = self::retrieve_context(
+			$question,
+			$screen_context,
+			self::is_archive_lookup_question( $question )
+		);
 		if ( is_wp_error( $retrieval ) ) {
 			return $retrieval;
 		}
@@ -124,7 +155,18 @@ final class Dewey_Engine {
 			);
 		}
 
-		$answer_result = self::generate_answer( $question, $retrieval['context_blocks'], $assistant_system_prompt, $history, $page_context, $post_id, $screen_context );
+		$answer_result = self::generate_answer(
+			$question,
+			$retrieval['context_blocks'],
+			$assistant_system_prompt,
+			$history,
+			$page_context,
+			$post_id,
+			$screen_context,
+			array(
+				'retrieval_confidence' => (float) ( $retrieval['confidence'] ?? 0 ),
+			)
+		);
 		if ( is_wp_error( $answer_result ) ) {
 			return $answer_result;
 		}
@@ -139,6 +181,17 @@ final class Dewey_Engine {
 				'title_fallback_hits'   => ! empty( $retrieval['title_fallback_used'] ) ? 1 : 0,
 				'date_bias_applied'     => ! empty( $retrieval['date_bias_applied'] ) ? 1 : 0,
 				'screen_filter_applied' => ! empty( $retrieval['screen_filter_applied'] ) ? 1 : 0,
+				'full_generation_runs'  => 1,
+				'prompt_chars_total'    => (int) ( $answer_result['prompt_chars_estimate'] ?? 0 ),
+				'prompt_tokens_total'   => (int) ( $answer_result['prompt_tokens_estimate'] ?? 0 ),
+				'history_turns_total'   => (int) ( $answer_result['history_turns_used'] ?? 0 ),
+				'context_blocks_total'  => (int) ( $answer_result['context_blocks_used'] ?? 0 ),
+				'site_context_injected' => ! empty( $answer_result['site_stats_injected'] ) ? 1 : 0,
+				'screen_context_injected' => ! empty( $answer_result['screen_context_injected'] ) ? 1 : 0,
+				'knowledge_topics_injected' => (int) ( $answer_result['knowledge_topics_injected'] ?? 0 ),
+				'prompt_budget_trims'      => (int) ( $answer_result['prompt_budget_trims'] ?? 0 ),
+				'followups_generated'      => ! empty( $answer_result['follow_ups'] ) ? 1 : 0,
+				'followups_suppressed'     => empty( $answer_result['follow_ups'] ) ? 1 : 0,
 			)
 		);
 
@@ -159,14 +212,14 @@ final class Dewey_Engine {
 	/**
 	 * @return array<string,mixed>|WP_Error
 	 */
-	private static function retrieve_context( string $question, array $screen_context = array() ) {
+	private static function retrieve_context( string $question, array $screen_context = array(), bool $allow_query_expansion = true ) {
 		$settings       = Dewey_Settings::get_all();
 		$mode           = (string) ( $settings['retrieval_mode'] ?? 'core' );
 		$effective_mode = self::resolve_retrieval_mode( $mode );
 
 		// Expand the question into multiple search terms so we catch semantic
 		// variations ("keeping readers coming back" → retention, engagement, …).
-		$search_terms = self::expand_query_for_search( $question );
+		$search_terms = self::expand_query_for_search( $question, $allow_query_expansion );
 
 		// Run searches for each term and merge, deduplicating by post_id.
 		// Aggregate scores so a post that appears in multiple term results
@@ -229,8 +282,10 @@ final class Dewey_Engine {
 		}
 
 		$max_content = Dewey_Settings::search_max_content();
+		$max_context_content = max( 120, min( $max_content, 240 ) );
 		$citations   = array();
 		$contexts    = array();
+		$context_count = 0;
 		foreach ( $raw_results as $result ) {
 			$post_id   = (int) ( $result['post_id'] ?? 0 );
 			$title     = (string) ( $result['title'] ?? '' );
@@ -247,7 +302,16 @@ final class Dewey_Engine {
 				'permalink' => $permalink,
 				'snippet'   => $snippet,
 			);
-			$contexts[] = sprintf( '[%d] %s (%s): %s', $post_id, $title, $permalink, $snippet );
+			if ( $context_count < self::MAX_CONTEXT_BLOCKS ) {
+				$contexts[] = sprintf(
+					'[%d] %s (%s): %s',
+					$post_id,
+					$title,
+					$permalink,
+					self::safe_substr( $snippet, $max_context_content )
+				);
+				$context_count++;
+			}
 		}
 
 		return array(
@@ -269,8 +333,11 @@ final class Dewey_Engine {
 	 * @param string $question
 	 * @return array<int,string>
 	 */
-	private static function expand_query_for_search( string $question ): array {
+	private static function expand_query_for_search( string $question, bool $allow_ai_expansion = true ): array {
 		$fallback = array( $question );
+		if ( ! $allow_ai_expansion || strlen( trim( $question ) ) < 18 ) {
+			return $fallback;
+		}
 
 		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 			return $fallback;
@@ -682,7 +749,7 @@ final class Dewey_Engine {
 	 * @param int                                       $post_id       Post currently open in the editor.
 	 * @return array<string,mixed>|WP_Error
 	 */
-	private static function generate_answer( string $question, array $context_blocks, string $assistant_system_prompt, array $history = array(), string $page_context = '', int $post_id = 0, array $screen_context = array() ) {
+	private static function generate_answer( string $question, array $context_blocks, string $assistant_system_prompt, array $history = array(), string $page_context = '', int $post_id = 0, array $screen_context = array(), array $options = array() ) {
 		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 			return new WP_Error(
 				'dewey_ai_unavailable',
@@ -692,71 +759,56 @@ final class Dewey_Engine {
 		}
 
 		$has_context = ! empty( $context_blocks );
+		$retrieval_confidence = (float) ( $options['retrieval_confidence'] ?? 0.0 );
 
-		if ( $has_context ) {
-			$system_instruction = __(
+		$base_system_instruction = $has_context
+			? __(
 				"You are Dewey — a fun, quick-witted WordPress assistant who lives in the dashboard. You have access to this site's archive. Use the provided content snippets to answer. Be conversational, warm, and direct — like a knowledgeable friend, not a formal report. Cite sources inline as [post_id]. No fluff or filler. Use clean Markdown (short paragraphs, bullets when useful). Never claim you cannot access the site's content.",
 				'dewey'
-			);
-			$context_payload = implode( "\n\n", $context_blocks );
-			$user_prompt     = sprintf(
-				"Question: %s\n\nArchive context:\n%s\n\nAnswer conversationally. Reference source IDs like [123] inline.",
-				$question,
-				$context_payload
-			);
-		} else {
-			$system_instruction = __(
+			)
+			: __(
 				'You are Dewey — a fun, quick-witted WordPress assistant who lives in the dashboard. Answer from your general knowledge. Be conversational, warm, practical, and concise — like a clever colleague. You know WordPress deeply. No fluff, no disclaimers, no corporate speak. Use clean Markdown formatting.',
 				'dewey'
 			);
-			$user_prompt = $question;
-		}
 
 		if ( '' !== trim( $assistant_system_prompt ) ) {
-			$system_instruction = trim( $assistant_system_prompt ) . "\n\n" . $system_instruction;
+			$base_system_instruction = trim( $assistant_system_prompt ) . "\n\n" . $base_system_instruction;
 		}
 
-		// Prepend the current admin screen so the AI can give context-aware answers.
-		// e.g. if the user is on "edit" they're looking at a posts list; "post" means the editor.
-		if ( '' !== $page_context ) {
-			$system_instruction = 'Current wp-admin screen: ' . $page_context . "\n\n" . $system_instruction;
-		}
-		$screen_adapter_context = self::build_screen_adapter_context( $screen_context );
-		if ( '' !== $screen_adapter_context ) {
-			$system_instruction = $screen_adapter_context . "\n\n" . $system_instruction;
-		}
+		$user_prompt = $has_context
+			? sprintf(
+				"Question: %s\n\nArchive context:\n%s\n\nAnswer conversationally. Reference source IDs like [123] inline.",
+				$question,
+				implode( "\n\n", $context_blocks )
+			)
+			: $question;
 
-		// Prepend the specific post being edited so Dewey can reference it by name.
 		$post_context = self::get_current_post_context( $post_id );
-		if ( '' !== $post_context ) {
-			$system_instruction = $post_context . "\n\n" . $system_instruction;
-		}
+		$optional_blocks = array(
+			'page_context'   => '' !== $page_context && self::should_include_screen_context( $question, $screen_context )
+				? 'Current wp-admin screen: ' . $page_context
+				: '',
+			'screen_context' => self::should_include_screen_context( $question, $screen_context )
+				? self::build_screen_adapter_context( $screen_context )
+				: '',
+			'site_stats'     => self::should_include_site_stats( $question )
+				? self::get_site_stats_context()
+				: '',
+			'knowledge'      => '',
+		);
 
-		// Prepend a brief site overview so the AI can reference real numbers without
-		// needing to search the archive first.
-		$site_stats = self::get_site_stats_context();
-		if ( '' !== $site_stats ) {
-			$system_instruction = 'Site overview: ' . $site_stats . "\n\n" . $system_instruction;
-		}
-
-		// Inject WordPress reference documentation when the question maps to a
-		// known WordPress topic.  Keeps injections tight (~800 tokens max) by
-		// capping at two topics and requiring a minimum relevance score.
-		$wp_docs = Dewey_Knowledge::find_relevant( $question );
-		if ( ! empty( $wp_docs ) ) {
-			$docs_context = "WordPress reference context:\n";
-			foreach ( $wp_docs as $doc ) {
-				$docs_context .= '### ' . $doc['title'] . "\n" . $doc['excerpt'] . "\n\n";
+		$wp_docs = array();
+		if ( self::should_include_wp_knowledge( $question, $retrieval_confidence ) ) {
+			$wp_docs = Dewey_Knowledge::find_relevant( $question );
+			if ( ! empty( $wp_docs ) ) {
+				$docs_context = "WordPress reference context:\n";
+				foreach ( $wp_docs as $doc ) {
+					$excerpt = self::safe_substr( (string) ( $doc['excerpt'] ?? '' ), 700 );
+					$docs_context .= '### ' . (string) ( $doc['title'] ?? '' ) . "\n" . $excerpt . "\n\n";
+				}
+				$optional_blocks['knowledge'] = trim( $docs_context );
 			}
-			$system_instruction = $docs_context . "\n\n" . $system_instruction;
 		}
-
-		// Ask the model to append follow-up questions in a parseable tag so we can
-		// surface them as chips without a second API call.
-		$system_instruction .=
-			"\n\nAt the very end of your response — after all content — output exactly one line in this format and nothing after it:\n" .
-			'<dewey-followups>Q1|Q2|Q3</dewey-followups>' . "\n" .
-			'Where Q1, Q2, Q3 are three natural follow-up questions the user might ask next. Each question must be under 80 characters. Do not number them. Do not add any text after the closing tag.';
 
 		$settings          = Dewey_Settings::get_all();
 		$tone              = (string) ( $settings['assistant_tone'] ?? 'match' );
@@ -765,32 +817,91 @@ final class Dewey_Engine {
 			'precise' => ' Tone: switch to precise and technical mode — exact terms, no hand-waving, be specific.',
 			default   => '',
 		};
-		if ( '' !== $tone_modifier ) {
-			$system_instruction .= $tone_modifier;
-		}
 
 		$verbosity          = (string) ( $settings['assistant_verbosity'] ?? 'concise' );
 		$verbosity_modifier = match ( $verbosity ) {
 			'detailed' => ' Verbosity: thorough — explain your reasoning, include relevant context, and use examples where helpful.',
 			default    => ' Verbosity: concise — tight paragraphs, no filler, no padding.',
 		};
+
+		$system_instruction = $base_system_instruction;
+		$prepend_order = array( 'knowledge', 'site_stats', 'screen_context', 'page_context' );
+		foreach ( $prepend_order as $key ) {
+			$block = trim( (string) ( $optional_blocks[ $key ] ?? '' ) );
+			if ( '' !== $block ) {
+				$label = 'site_stats' === $key ? 'Site overview: ' : '';
+				$system_instruction = $label . $block . "\n\n" . $system_instruction;
+			}
+		}
+		if ( '' !== $post_context ) {
+			$system_instruction = $post_context . "\n\n" . $system_instruction;
+		}
+		if ( '' !== $tone_modifier ) {
+			$system_instruction .= $tone_modifier;
+		}
 		$system_instruction .= $verbosity_modifier;
 
-		// Prepend recent conversation turns so the AI can handle follow-ups
-		// like "tell me more about that" or "which one should I use?".
-		if ( ! empty( $history ) ) {
-			$history_lines = array();
-			foreach ( $history as $turn ) {
-				$role  = 'user' === ( $turn['role'] ?? '' ) ? 'User' : 'Dewey';
-				$text  = self::safe_substr( trim( (string) ( $turn['text'] ?? '' ) ), 500 );
-				if ( '' !== $text ) {
-					$history_lines[] = $role . ': ' . $text;
+		$history_lines = self::build_prompt_history_lines( $history );
+		$history_block = empty( $history_lines ) ? '' : "Previous conversation:\n" . implode( "\n", $history_lines ) . "\n\n";
+		if ( '' !== $history_block ) {
+			$user_prompt = $history_block . $user_prompt;
+		}
+
+		$trim_order  = array( 'knowledge', 'site_stats', 'screen_context', 'page_context' );
+		$trim_count  = 0;
+		$budget_chars = (int) apply_filters( 'dewey_prompt_budget_chars', 12000 );
+		$budget_chars = max( 3000, $budget_chars );
+		$history_trims = 0;
+		while ( self::estimate_prompt_chars( $system_instruction, $user_prompt ) > $budget_chars ) {
+			$trimmed = false;
+			foreach ( $trim_order as $key ) {
+				if ( '' !== trim( (string) ( $optional_blocks[ $key ] ?? '' ) ) ) {
+					$optional_blocks[ $key ] = '';
+					$trim_count++;
+					$trimmed = true;
+					break;
 				}
 			}
-			if ( ! empty( $history_lines ) ) {
+			if ( ! $trimmed && '' !== $history_block && count( $history_lines ) > 2 ) {
+				$history_lines = array_slice( $history_lines, -2 );
 				$history_block = "Previous conversation:\n" . implode( "\n", $history_lines ) . "\n\n";
-				$user_prompt   = $history_block . $user_prompt;
+				$history_trims++;
+				$trimmed = true;
 			}
+			if ( ! $trimmed ) {
+				break;
+			}
+
+			$system_instruction = $base_system_instruction;
+			foreach ( $prepend_order as $key ) {
+				$block = trim( (string) ( $optional_blocks[ $key ] ?? '' ) );
+				if ( '' !== $block ) {
+					$label = 'site_stats' === $key ? 'Site overview: ' : '';
+					$system_instruction = $label . $block . "\n\n" . $system_instruction;
+				}
+			}
+			if ( '' !== $post_context ) {
+				$system_instruction = $post_context . "\n\n" . $system_instruction;
+			}
+			if ( '' !== $tone_modifier ) {
+				$system_instruction .= $tone_modifier;
+			}
+			$system_instruction .= $verbosity_modifier;
+			$user_prompt = ( '' !== $history_block ? $history_block : '' ) . ( $has_context
+				? sprintf(
+					"Question: %s\n\nArchive context:\n%s\n\nAnswer conversationally. Reference source IDs like [123] inline.",
+					$question,
+					implode( "\n\n", $context_blocks )
+				)
+				: $question );
+		}
+
+		$should_request_followups = self::should_request_followups( $question, $context_blocks );
+		if ( $should_request_followups ) {
+			$system_instruction .=
+				"\n\nAt the very end of your response — after all content — output exactly one line in this format and nothing after it:\n" .
+				'<dewey-followups>Q1|Q2|Q3</dewey-followups>' . "\n" .
+				'Where Q1, Q2, Q3 are three natural follow-up questions the user might ask next. Each question must be under 80 characters. Do not number them. Do not add any text after the closing tag.';
 		}
 
 		try {
@@ -823,9 +934,8 @@ final class Dewey_Engine {
 
 		$text = self::enforce_voice_guardrails( (string) $text, $has_context );
 
-		// Extract and strip the follow-up questions tag the model was asked to append.
 		$follow_ups = array();
-		if ( preg_match( '/<dewey-followups>(.*?)<\/dewey-followups>/si', $text, $fu_match ) ) {
+		if ( $should_request_followups && preg_match( '/<dewey-followups>(.*?)<\/dewey-followups>/si', $text, $fu_match ) ) {
 			$text = trim( (string) preg_replace( '/<dewey-followups>.*?<\/dewey-followups>/si', '', $text ) );
 			$raw_questions = array_filter(
 				array_map( 'trim', explode( '|', $fu_match[1] ) ),
@@ -841,6 +951,14 @@ final class Dewey_Engine {
 			'follow_ups' => $follow_ups,
 			'provider'   => '',
 			'model'      => '',
+			'prompt_chars_estimate' => self::estimate_prompt_chars( $system_instruction, $user_prompt ),
+			'prompt_tokens_estimate' => self::estimate_tokens_from_chars( self::estimate_prompt_chars( $system_instruction, $user_prompt ) ),
+			'history_turns_used' => count( $history_lines ),
+			'context_blocks_used' => count( $context_blocks ),
+			'site_stats_injected' => '' !== trim( (string) ( $optional_blocks['site_stats'] ?? '' ) ),
+			'screen_context_injected' => '' !== trim( (string) ( $optional_blocks['screen_context'] ?? '' ) ) || '' !== trim( (string) ( $optional_blocks['page_context'] ?? '' ) ),
+			'knowledge_topics_injected' => count( $wp_docs ),
+			'prompt_budget_trims' => $trim_count + $history_trims,
 		);
 	}
 
@@ -1477,6 +1595,120 @@ final class Dewey_Engine {
 	}
 
 	/**
+	 * Return deterministic responses for tiny social chatter so we can skip
+	 * retrieval/model generation and keep token usage near zero.
+	 *
+	 * @param string $question
+	 * @return string
+	 */
+	private static function deterministic_fast_path_answer( string $question ): string {
+		$normalized = strtolower( trim( $question ) );
+		if ( '' === $normalized ) {
+			return '';
+		}
+
+		if ( preg_match( '/^(thanks|thank you|thx|awesome|great|perfect)[!. ]*$/i', $normalized ) ) {
+			return __( 'Anytime. Keep going — I am right here when you need me.', 'dewey' );
+		}
+		if ( preg_match( '/^(hi|hello|hey|yo)[!. ]*$/i', $normalized ) ) {
+			return __( 'Hey. What should we tackle in WordPress?', 'dewey' );
+		}
+
+		return '';
+	}
+
+	/**
+	 * @param string $question
+	 * @return bool
+	 */
+	private static function should_include_site_stats( string $question ): bool {
+		return 1 === preg_match( '/\b(how many|count|total|published|posts?|categories?|last published|stats?|overview)\b/i', strtolower( $question ) );
+	}
+
+	/**
+	 * @param string              $question
+	 * @param array<string,mixed> $screen_context
+	 * @return bool
+	 */
+	private static function should_include_screen_context( string $question, array $screen_context ): bool {
+		if ( empty( $screen_context ) ) {
+			return false;
+		}
+		return 1 === preg_match( '/\b(plugin|theme|user|media|settings|screen|dashboard|post|page|draft|publish|trash|admin)\b/i', strtolower( $question ) );
+	}
+
+	/**
+	 * @param string $question
+	 * @param float  $retrieval_confidence
+	 * @return bool
+	 */
+	private static function should_include_wp_knowledge( string $question, float $retrieval_confidence ): bool {
+		$is_technical = self::is_technical_wp_question( $question );
+		if ( ! $is_technical ) {
+			return false;
+		}
+		if ( $retrieval_confidence < 0.55 ) {
+			return true;
+		}
+		return 1 === preg_match( '/\b(rest api|hook|filter|register_|wp_query|nonce|capabilit|transient|taxonomy|custom post type|cpt)\b/i', strtolower( $question ) );
+	}
+
+	/**
+	 * @param string $question
+	 * @return bool
+	 */
+	private static function is_technical_wp_question( string $question ): bool {
+		return 1 === preg_match( '/\b(wordpress|wp[-_]|plugin|theme|hook|filter|rest|endpoint|api|nonce|capability|cron|taxonomy|cpt|custom post type|wpdb|block editor|gutenberg)\b/i', strtolower( $question ) );
+	}
+
+	/**
+	 * @param string            $question
+	 * @param array<int,string> $context_blocks
+	 * @return bool
+	 */
+	private static function should_request_followups( string $question, array $context_blocks ): bool {
+		$word_count = str_word_count( wp_strip_all_tags( $question ) );
+		if ( ! empty( $context_blocks ) ) {
+			return $word_count >= 3;
+		}
+		return $word_count >= 6;
+	}
+
+	/**
+	 * @param array<int,array{role:string,text:string}> $history
+	 * @return array<int,string>
+	 */
+	private static function build_prompt_history_lines( array $history ): array {
+		$history = array_slice( $history, -self::MAX_HISTORY_TURNS );
+		$lines   = array();
+		foreach ( $history as $turn ) {
+			$role = 'user' === ( $turn['role'] ?? '' ) ? 'User' : 'Dewey';
+			$text = self::safe_substr( trim( (string) ( $turn['text'] ?? '' ) ), self::MAX_HISTORY_CHARS );
+			if ( '' !== $text ) {
+				$lines[] = $role . ': ' . $text;
+			}
+		}
+		return $lines;
+	}
+
+	/**
+	 * @param string $system_instruction
+	 * @param string $user_prompt
+	 * @return int
+	 */
+	private static function estimate_prompt_chars( string $system_instruction, string $user_prompt ): int {
+		return strlen( $system_instruction ) + strlen( $user_prompt );
+	}
+
+	/**
+	 * @param int $chars
+	 * @return int
+	 */
+	private static function estimate_tokens_from_chars( int $chars ): int {
+		return (int) ceil( max( 0, $chars ) / 4 );
+	}
+
+	/**
 	 * Retrieve aggregate query telemetry counters for status/debug output.
 	 *
 	 * @return array<string,mixed>
@@ -1500,6 +1732,18 @@ final class Dewey_Engine {
 				'date_bias_applied'     => 0,
 				'screen_filter_applied' => 0,
 				'low_confidence_clarifications' => 0,
+				'fast_path_responses'   => 0,
+				'full_generation_runs'  => 0,
+				'prompt_chars_total'    => 0,
+				'prompt_tokens_total'   => 0,
+				'history_turns_total'   => 0,
+				'context_blocks_total'  => 0,
+				'site_context_injected' => 0,
+				'screen_context_injected' => 0,
+				'knowledge_topics_injected' => 0,
+				'prompt_budget_trims'   => 0,
+				'followups_generated'   => 0,
+				'followups_suppressed'  => 0,
 				'last_updated'          => '',
 			)
 		);

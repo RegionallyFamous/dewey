@@ -211,7 +211,7 @@ export const FIRST_OPEN_MESSAGE = __(
 );
 
 export const NO_AI_MESSAGE = __(
-	"I need an AI provider to do the good stuff. Head to Settings → Connectors, drop in a key, and I'll actually be useful. Promise.",
+	'That one needs an AI provider connected — head to Settings → Connectors to set one up. I can still navigate anywhere in wp-admin and manage your content in the meantime.',
 	'dewey'
 );
 
@@ -247,12 +247,9 @@ Formatting rules:
 - No raw HTML.
 `.trim();
 
-export function getSpeechText( deweyState, isAiConnected ) {
+export function getSpeechText( deweyState ) {
 	if ( deweyState === 'hello' ) {
 		return __( "Hey! What's up?", 'dewey' );
-	}
-	if ( deweyState === 'sad' && ! isAiConnected ) {
-		return __( 'Need an AI key to help!', 'dewey' );
 	}
 	if ( deweyState === 'sad' ) {
 		return __( 'Hmm. Let me try harder.', 'dewey' );

@@ -26,7 +26,8 @@ import { useDewey } from './useDewey';
 
 const MAX_INPUT_CHARS = 500;
 const MAX_MESSAGES = 80;
-const MAX_HISTORY_TURNS = 10;
+const MAX_HISTORY_TURNS = 6;
+const MAX_HISTORY_CHARS = 320;
 const SUBMIT_THROTTLE_MS = 800;
 const CONNECTION_REFRESH_THROTTLE_MS = 2000;
 const STORAGE_VERSION = 1;
@@ -419,11 +420,44 @@ function buildHistory( allMessages ) {
 			m.id !== 'welcome' &&
 			( m.role === 'user' || m.role === 'assistant' )
 	);
-	const recent = conversational.slice( -MAX_HISTORY_TURNS );
-	return recent.map( ( m ) => ( {
-		role: m.role,
-		text: String( m.text || '' ).slice( 0, MAX_INPUT_CHARS ),
-	} ) );
+	if ( conversational.length === 0 ) {
+		return [];
+	}
+
+	// Keep more user turns than assistant turns: user context tends to carry
+	// more decision signal, while a single recent assistant turn preserves
+	// conversational continuity at lower token cost.
+	const includeIndexes = new Set();
+	const maxUserTurns = Math.max( 1, MAX_HISTORY_TURNS - 1 );
+	let userCount = 0;
+
+	for ( let i = conversational.length - 1; i >= 0; i-- ) {
+		if ( conversational[ i ]?.role !== 'user' ) {
+			continue;
+		}
+		includeIndexes.add( i );
+		userCount++;
+		if ( userCount >= maxUserTurns ) {
+			break;
+		}
+	}
+
+	for ( let i = conversational.length - 1; i >= 0; i-- ) {
+		if ( conversational[ i ]?.role === 'assistant' ) {
+			includeIndexes.add( i );
+			break;
+		}
+	}
+
+	return Array.from( includeIndexes )
+		.sort( ( a, b ) => a - b )
+		.map( ( index ) => conversational[ index ] )
+		.filter( Boolean )
+		.slice( -MAX_HISTORY_TURNS )
+		.map( ( m ) => ( {
+			role: m.role,
+			text: String( m.text || '' ).slice( 0, MAX_HISTORY_CHARS ),
+		} ) );
 }
 
 function isValidStarterAction( action ) {
@@ -586,10 +620,7 @@ export function useDeweyChat() {
 		};
 	}, [] );
 
-	const speech = useMemo(
-		() => getSpeechText( deweyState, isAiConnected ),
-		[ deweyState, isAiConnected ]
-	);
+	const speech = useMemo( () => getSpeechText( deweyState ), [ deweyState ] );
 
 	const addMessage = useCallback( ( role, text, extra = {} ) => {
 		setMessages( ( current ) => {

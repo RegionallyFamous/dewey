@@ -500,8 +500,8 @@ final class Dewey_REST_Controller {
 	/**
 	 * Sanitize conversation history sent from the frontend.
 	 *
-	 * Accepts up to 10 turns, each with a 'role' (user|assistant) and a 'text'
-	 * string capped at 500 characters. Invalid entries are silently dropped.
+	 * Accepts up to 6 turns, each with a 'role' (user|assistant) and a 'text'
+	 * string capped at 320 characters. Invalid entries are silently dropped.
 	 *
 	 * @param mixed $history
 	 * @return array<int,array{role:string,text:string}>
@@ -512,7 +512,7 @@ final class Dewey_REST_Controller {
 		}
 
 		$sanitized = array();
-		foreach ( array_slice( $history, 0, 10 ) as $item ) {
+		foreach ( array_slice( $history, 0, 6 ) as $item ) {
 			if ( ! is_array( $item ) ) {
 				continue;
 			}
@@ -522,7 +522,7 @@ final class Dewey_REST_Controller {
 			}
 			$text = wp_strip_all_tags( (string) ( $item['text'] ?? '' ) );
 			$text = preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', (string) $text );
-			$text = self::safe_substr( trim( (string) $text ), 500 );
+			$text = self::safe_substr( trim( (string) $text ), 320 );
 			if ( '' === $text ) {
 				continue;
 			}

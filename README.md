@@ -69,7 +69,7 @@ Close the panel, navigate to a different screen, come back — your thread is st
 
 ## Get started
 
-Requires WordPress 7.0+ and PHP 8.1+. An AI provider connected in Settings → Connectors unlocks questions and answers. Navigation and content actions work immediately without one.
+Requires WordPress `7.0+` and PHP `8.1+`. An AI provider connected in Settings → Connectors unlocks questions and answers. Navigation and content actions work immediately without one.
 
 → [Installation and setup](docs/wiki/Getting-Started.md)
 

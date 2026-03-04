@@ -22,7 +22,6 @@ function DeweyPanel( {
 	hasAskedStarter,
 	isSubmitting,
 	isAiConnected,
-	connectionDebug,
 	citationStyle,
 	onStarterSelect,
 	onMessageAction,
@@ -64,19 +63,15 @@ function DeweyPanel( {
 				<div id={ titleId } className="dewey-panel__title">
 					<span>{ __( 'Ask Dewey', 'dewey' ) }</span>
 				</div>
-				<div
-					className={ `dewey-panel__connection ${
-						isAiConnected
-							? 'dewey-panel__connection--connected'
-							: 'dewey-panel__connection--disconnected'
-					}` }
-					role="status"
-					aria-live="polite"
-				>
-					{ isAiConnected
-						? __( 'AI connected', 'dewey' )
-						: __( 'AI not connected', 'dewey' ) }
-				</div>
+				{ isAiConnected && (
+					<div
+						className="dewey-panel__connection dewey-panel__connection--connected"
+						role="status"
+						aria-live="polite"
+					>
+						{ __( 'AI on', 'dewey' ) }
+					</div>
+				) }
 				<Button
 					variant="tertiary"
 					className="dewey-panel__clear"
@@ -96,24 +91,14 @@ function DeweyPanel( {
 
 			{ ! isAiConnected && (
 				<div className="dewey-panel__notice" role="note">
-					{ __( 'Connect an AI provider in', 'dewey' ) }{ ' ' }
+					{ __( 'Navigation and actions work now.', 'dewey' ) }{ ' ' }
 					<a
 						href={ connectorsUrl }
 						className="dewey-panel__notice-link"
 					>
-						{ __( 'Settings -> Connectors', 'dewey' ) }
+						{ __( 'Add an AI provider', 'dewey' ) }
 					</a>{ ' ' }
-					{ __( 'to get full archive answers.', 'dewey' ) }
-					{ connectionDebug && (
-						<details className="dewey-panel__debug">
-							<summary>
-								{ __( 'Connection diagnostics', 'dewey' ) }
-							</summary>
-							<pre className="dewey-panel__debug-output">
-								{ JSON.stringify( connectionDebug, null, 2 ) }
-							</pre>
-						</details>
-					) }
+					{ __( 'to unlock Q&A and archive search.', 'dewey' ) }
 				</div>
 			) }
 

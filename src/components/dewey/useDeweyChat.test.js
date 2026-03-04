@@ -248,6 +248,44 @@ describe( 'useDeweyChat', () => {
 		expect( handlers.onAnswerReady ).toHaveBeenCalledWith( 1 );
 	} );
 
+	it( 'sends compact history payload to reduce token usage', async () => {
+		window.deweyConfig = {
+			aiConnected: true,
+			restBase: 'https://example.com/wp-json/dewey/v1',
+			nonce: 'valid-nonce',
+		};
+		window.fetch = jest.fn().mockResolvedValue( {
+			ok: true,
+			json: async () => ( {
+				answer: 'ok',
+				citations: [],
+			} ),
+		} );
+		const { result } = renderHook( () => useDeweyChat() );
+		act( () => {
+			result.current.handleStarter( STARTER_ACTIONS[ 0 ] );
+			result.current.handleStarter( STARTER_ACTIONS[ 1 ] );
+			result.current.handleStarter( STARTER_ACTIONS[ 2 ] );
+			result.current.setInputValue( 'Second question' );
+		} );
+		await act( async () => {
+			await result.current.handleSubmit( { preventDefault: jest.fn() } );
+		} );
+
+		const queryCalls = window.fetch.mock.calls.filter(
+			( call ) =>
+				typeof call[ 0 ] === 'string' &&
+				call[ 0 ].endsWith( '/query' ) &&
+				typeof call[ 1 ]?.body === 'string'
+		);
+		const payload = JSON.parse( queryCalls[ 0 ][ 1 ].body );
+		expect( Array.isArray( payload.history ) ).toBe( true );
+		expect( payload.history.length ).toBeLessThanOrEqual( 6 );
+		for ( const turn of payload.history ) {
+			expect( turn.text.length ).toBeLessThanOrEqual( 320 );
+		}
+	} );
+
 	it( 'executes confirm actions through /confirm-action', async () => {
 		window.deweyConfig = {
 			aiConnected: true,
