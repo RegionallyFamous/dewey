@@ -26,6 +26,17 @@ const SUBMIT_THROTTLE_MS = 800;
 const CONTROL_CHARS_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 const REQUEST_TIMEOUT_MS = 30000;
 
+function isDebugEnabled() {
+	return Boolean( window.deweyConfig?.debugEnabled );
+}
+
+function emitDebugLog( label, payload ) {
+	if ( ! isDebugEnabled() || ! window.console ) {
+		return;
+	}
+	window.console.info( `[Dewey AI Debug] ${ label }`, payload );
+}
+
 export function getInitialOpenState() {
 	try {
 		return ! window.localStorage.getItem( STORAGE_KEYS.openedOnce );
@@ -119,14 +130,24 @@ async function callDeweyApi( path, payload = null ) {
 
 	const body = await response.json().catch( () => ( {} ) );
 	if ( ! response.ok ) {
-		throw new Error(
+		const error = new Error(
 			typeof body?.message === 'string' && body.message
 				? body.message
 				: `Request failed (${ response.status })`
 		);
+		error.deweyCode =
+			typeof body?.code === 'string' ? body.code : 'dewey_request_failed';
+		error.deweyStatus = response.status;
+		error.deweyBody = body;
+		throw error;
 	}
 
 	return body;
+}
+
+async function getServerStatus() {
+	const query = isDebugEnabled() ? '?debug=1' : '';
+	return callDeweyApi( `/status${ query }` );
 }
 
 function normalizeCitations( citations ) {
@@ -173,6 +194,7 @@ export function useDeweyChat() {
 	const [ isAiConnected, setIsAiConnected ] = useState( () =>
 		detectAiConnection()
 	);
+	const [ connectionDebug, setConnectionDebug ] = useState( null );
 	const inputRef = useRef( null );
 	const lastSubmitAtRef = useRef( 0 );
 	const { deweyState, deweyHandlers } = useDewey();
@@ -196,23 +218,87 @@ export function useDeweyChat() {
 		// Settings → Connectors in another tab and connects a key, then returns,
 		// we pick up a page reload which refreshes the PHP-injected value.
 		let isActive = true;
-		const refreshConnection = () => {
+		const refreshConnection = async () => {
+			let runtimeSupported = null;
+			let runtimeError = '';
+			let serverStatus = null;
+			let serverError = '';
+			const localized = detectAiConnection();
+
 			const aiClient = window.wp?.aiClient;
-			if ( ! aiClient || typeof aiClient.prompt !== 'function' ) {
-				setIsAiConnected( detectAiConnection() );
-				return;
+			if ( aiClient && typeof aiClient.prompt === 'function' ) {
+				try {
+					const prompt = aiClient.prompt( 'Connection check' );
+					if (
+						typeof prompt?.isSupportedForTextGeneration ===
+						'function'
+					) {
+						runtimeSupported = Boolean(
+							await prompt.isSupportedForTextGeneration()
+						);
+					}
+				} catch ( error ) {
+					runtimeError =
+						error instanceof Error
+							? error.message
+							: 'Client capability check failed.';
+				}
 			}
 
-			void detectAiConnectionAsync().then( ( next ) => {
-				if ( isActive ) {
-					setIsAiConnected( next );
+			if ( typeof window.fetch === 'function' ) {
+				try {
+					serverStatus = await getServerStatus();
+				} catch ( error ) {
+					serverError =
+						error instanceof Error
+							? error.message
+							: 'Status endpoint probe failed.';
 				}
-			} );
+			}
+
+			const serverConnected =
+				typeof serverStatus?.ai_connected === 'boolean'
+					? serverStatus.ai_connected
+					: null;
+			const nextConnected = Boolean(
+				serverConnected ?? runtimeSupported ?? localized
+			);
+			const hasProbeData =
+				null !== runtimeSupported ||
+				null !== serverConnected ||
+				'' !== runtimeError ||
+				'' !== serverError;
+			const nextDebug = {
+				localized,
+				runtimeSupported,
+				runtimeError,
+				serverConnected,
+				serverError,
+				serverDebug:
+					serverStatus &&
+					typeof serverStatus === 'object' &&
+					serverStatus.ai_connection_debug
+						? serverStatus.ai_connection_debug
+						: null,
+			};
+
+			if ( hasProbeData || isDebugEnabled() ) {
+				emitDebugLog( 'connection_probe', nextDebug );
+			}
+
+			if ( isActive ) {
+				if ( hasProbeData ) {
+					setIsAiConnected( nextConnected );
+				}
+				if ( hasProbeData || isDebugEnabled() ) {
+					setConnectionDebug( nextDebug );
+				}
+			}
 		};
 
-		refreshConnection();
+		void refreshConnection();
 		const onRefresh = () => {
-			refreshConnection();
+			void refreshConnection();
 		};
 		window.addEventListener( 'focus', onRefresh );
 		document.addEventListener( 'visibilitychange', onRefresh );
@@ -294,8 +380,7 @@ export function useDeweyChat() {
 			setInputValue( '' );
 			addMessage( 'user', question );
 			deweyHandlers.onQueryStart();
-
-			if ( ! isAiConnected ) {
+			if ( ! isAiConnected && ! getApiConfig() ) {
 				deweyHandlers.onNoResults();
 				addMessage( 'assistant', NO_AI_MESSAGE );
 				return;
@@ -304,6 +389,7 @@ export function useDeweyChat() {
 			setIsSubmitting( true );
 			try {
 				const response = await callDeweyApi( '/query', { question } );
+				setIsAiConnected( true );
 				if ( response?.requires_confirm && response?.token ) {
 					deweyHandlers.onPostsFound( 1 );
 					deweyHandlers.onAnswerReady( 1 );
@@ -344,6 +430,24 @@ export function useDeweyChat() {
 					}
 				);
 			} catch ( error ) {
+				const maybeCode =
+					error &&
+					typeof error === 'object' &&
+					typeof error.deweyCode === 'string'
+						? error.deweyCode
+						: '';
+				const isConnectionError =
+					'dewey_ai_unavailable' === maybeCode ||
+					( error instanceof Error &&
+						/error while connecting|ai client is not available|provider/i.test(
+							error.message
+						) );
+				if ( isConnectionError ) {
+					setIsAiConnected( false );
+					deweyHandlers.onNoResults();
+					addMessage( 'assistant', NO_AI_MESSAGE );
+					return;
+				}
 				deweyHandlers.onError();
 				addMessage(
 					'assistant',
@@ -391,6 +495,7 @@ export function useDeweyChat() {
 		hasAskedStarter,
 		isSubmitting,
 		isAiConnected,
+		connectionDebug,
 		deweyState,
 		speech,
 		inputRef,

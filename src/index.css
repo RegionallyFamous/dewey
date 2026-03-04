@@ -252,6 +252,31 @@
 	border-radius: 2px;
 }
 
+.dewey-panel__debug {
+	margin-top: 8px;
+}
+
+.dewey-panel__debug summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.dewey-panel__debug-output {
+	margin: 6px 0 0;
+	padding: 8px;
+	border: 1px solid #e4b3b8;
+	border-radius: 4px;
+	background: #fff;
+	color: #50575e;
+	font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+	font-size: 11px;
+	line-height: 1.35;
+	max-height: 180px;
+	overflow: auto;
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
 /* ─── Intro state (before any messages) ─────────────────────────────────────── */
 
 .dewey-panel__intro {

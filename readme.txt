@@ -4,7 +4,7 @@ Tags: ai, content search, admin assistant, writing assistant, knowledge base
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 1.0.11
+Stable tag: 1.0.13
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -44,6 +44,17 @@ No. Dewey retrieves relevant excerpts first and sends only the minimum context n
 Dewey runs in wp-admin for authenticated users with appropriate capabilities. Query/status routes are for editors, while maintenance actions like reindex are admin-only.
 
 == Changelog ==
+
+= 1.0.13 =
+* Fixed AI connection detection: switched config injection to wp_add_inline_script + wp_json_encode so PHP booleans arrive in JS correctly (root cause of always showing "not connected").
+* Removed dead wp.aiClient/wp.ai runtime probes confirmed absent in WP 7.0.
+* Fixed Connectors link URL resolution; simplified to trust PHP-injected admin_url() directly.
+* Corrected duplicate ARIA labelling on the chat dialog.
+* Committed previously untracked source files: REST controller, engine, indexer, mobile FAB component, POT translation template, and wiki docs.
+
+= 1.0.12 =
+* Release prep for Dewey 7.0 engine: full validation pass, docs alignment, and packaging readiness verification.
+* Stability polish for REST query/confirm/reindex flows and final guardrail checks before distribution.
 
 = 1.0.11 =
 * Added Dewey REST engine endpoints (`/query`, `/status`, `/reindex`, `/confirm-action`) with server-side retrieval and AI answer generation.

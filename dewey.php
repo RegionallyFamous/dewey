@@ -3,7 +3,7 @@
  * Plugin Name: Dewey AI Search Assistant
  * Plugin URI: https://github.com/regionally-famous/dewey
  * Description: Dewey brings live archive query and AI answers into wp-admin, with citations and built-in guardrails powered by WordPress 7.0 core capabilities.
- * Version: 1.0.11
+ * Version: 1.0.13
  * Requires at least: 7.0
  * Requires PHP: 8.1
  * Author: Regionally Famous
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'DEWEY_VERSION', '1.0.11' );
+define( 'DEWEY_VERSION', '1.0.13' );
 define( 'DEWEY_PLUGIN_FILE', __FILE__ );
 define( 'DEWEY_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DEWEY_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -190,6 +190,7 @@ function dewey_enqueue_admin_assets( string $hook_suffix ) {
 				'nonce'         => wp_create_nonce( 'wp_rest' ),
 				'aiConnected'   => dewey_ai_connection_status(),
 				'connectorsUrl' => esc_url_raw( dewey_get_connectors_admin_url() ),
+				'debugEnabled'  => current_user_can( 'manage_options' ),
 			)
 		) . ';',
 		'before'
@@ -217,6 +218,101 @@ function dewey_get_connectors_admin_url() {
 }
 
 /**
+ * Detect whether a value contains any non-empty scalar leaf.
+ *
+ * @param mixed $value Value to inspect recursively.
+ * @return bool
+ */
+function dewey_has_non_empty_secret_value( $value ): bool {
+	if ( is_string( $value ) ) {
+		return '' !== trim( $value );
+	}
+
+	if ( is_numeric( $value ) ) {
+		return '' !== trim( (string) $value );
+	}
+
+	if ( is_array( $value ) ) {
+		foreach ( $value as $child ) {
+			if ( dewey_has_non_empty_secret_value( $child ) ) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Build safe diagnostics for AI connection checks (no secrets exposed).
+ *
+ * @return array<string,mixed>
+ */
+function dewey_ai_connection_debug(): array {
+	$connector_option_keys = apply_filters(
+		'dewey_connector_option_keys',
+		array(
+			'connectors_ai_openai_api_key',
+			'connectors_ai_anthropic_api_key',
+			'connectors_ai_gemini_api_key',
+			'connectors_ai_google_api_key',
+			'connectors_openai_api_key',
+			'connectors_anthropic_api_key',
+			'connectors_gemini_api_key',
+		)
+	);
+	$connector_option_keys = is_array( $connector_option_keys ) ? $connector_option_keys : array();
+	$option_checks         = array();
+	$detected_option_key   = '';
+
+	foreach ( $connector_option_keys as $option_key ) {
+		if ( ! is_string( $option_key ) || '' === trim( $option_key ) ) {
+			continue;
+		}
+
+		$value        = get_option( $option_key, '' );
+		$has_credential = dewey_has_non_empty_secret_value( $value );
+		if ( '' === $detected_option_key && $has_credential ) {
+			$detected_option_key = $option_key;
+		}
+
+		$option_checks[] = array(
+			'key'            => $option_key,
+			'type'           => gettype( $value ),
+			'has_credential' => $has_credential,
+		);
+	}
+
+	$credentials          = get_option( 'wp_ai_client_provider_credentials', array() );
+	$legacy_has_any       = dewey_has_non_empty_secret_value( $credentials );
+	$legacy_provider_keys = is_array( $credentials ) ? array_keys( $credentials ) : array();
+
+	$core_helper_available = function_exists( 'wp_ai_has_connected_provider' );
+	$core_helper_result    = null;
+	$core_helper_error     = '';
+
+	if ( $core_helper_available ) {
+		try {
+			$core_helper_result = (bool) wp_ai_has_connected_provider();
+		} catch ( Throwable $e ) {
+			$core_helper_error = sanitize_text_field( $e->getMessage() );
+		}
+	}
+
+	return array(
+		'checked_at'             => gmdate( 'c' ),
+		'option_checks'          => $option_checks,
+		'detected_option_key'    => $detected_option_key,
+		'legacy_credentials_type' => gettype( $credentials ),
+		'legacy_provider_keys'   => is_array( $legacy_provider_keys ) ? array_values( $legacy_provider_keys ) : array(),
+		'legacy_has_any'         => $legacy_has_any,
+		'core_helper_available'  => $core_helper_available,
+		'core_helper_result'     => $core_helper_result,
+		'core_helper_error'      => $core_helper_error,
+	);
+}
+
+/**
  * Determine whether an AI provider is configured and ready.
  *
  * Uses connector option keys registered by core Connectors and keeps a
@@ -232,42 +328,19 @@ function dewey_ai_connection_status() {
 		return (bool) $filter_override;
 	}
 
-	$connector_option_keys = apply_filters(
-		'dewey_connector_option_keys',
-		array(
-			'connectors_openai_api_key',
-			'connectors_anthropic_api_key',
-			'connectors_gemini_api_key',
-		)
-	);
-	$connector_option_keys = is_array( $connector_option_keys ) ? $connector_option_keys : array();
+	$debug = dewey_ai_connection_debug();
 
-	foreach ( $connector_option_keys as $option_key ) {
-		if ( ! is_string( $option_key ) || '' === trim( $option_key ) ) {
-			continue;
-		}
+	if ( true === ( $debug['core_helper_result'] ?? null ) ) {
+		return true;
+	}
 
-		$value = get_option( $option_key, '' );
-		if ( is_string( $value ) && '' !== trim( $value ) ) {
+	foreach ( $debug['option_checks'] as $check ) {
+		if ( ! empty( $check['has_credential'] ) ) {
 			return true;
 		}
 	}
 
-	// Compatibility fallback for older option storage layouts.
-	$credentials = get_option( 'wp_ai_client_provider_credentials', array() );
-
-	if ( ! is_array( $credentials ) || empty( $credentials ) ) {
-		return false;
-	}
-
-	return ! empty(
-		array_filter(
-			$credentials,
-			static function ( $api_key ): bool {
-				return is_string( $api_key ) && '' !== $api_key;
-			}
-		)
-	);
+	return ! empty( $debug['legacy_has_any'] );
 }
 
 /**

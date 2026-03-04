@@ -22,6 +22,7 @@ function DeweyPanel( {
 	hasAskedStarter,
 	isSubmitting,
 	isAiConnected,
+	connectionDebug,
 	onStarterSelect,
 	onMessageAction,
 	onClose,
@@ -91,6 +92,16 @@ function DeweyPanel( {
 						{ __( 'Settings -> Connectors', 'dewey' ) }
 					</a>{ ' ' }
 					{ __( 'to get full archive answers.', 'dewey' ) }
+					{ connectionDebug && (
+						<details className="dewey-panel__debug">
+							<summary>
+								{ __( 'Connection diagnostics', 'dewey' ) }
+							</summary>
+							<pre className="dewey-panel__debug-output">
+								{ JSON.stringify( connectionDebug, null, 2 ) }
+							</pre>
+						</details>
+					) }
 				</div>
 			) }
 

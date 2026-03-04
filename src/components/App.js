@@ -15,6 +15,7 @@ export default function App() {
 		hasAskedStarter,
 		isSubmitting,
 		isAiConnected,
+		connectionDebug,
 		inputRef,
 		setInputValue,
 		togglePanel,
@@ -33,6 +34,7 @@ export default function App() {
 					hasAskedStarter={ hasAskedStarter }
 					isSubmitting={ isSubmitting }
 					isAiConnected={ isAiConnected }
+					connectionDebug={ connectionDebug }
 					onStarterSelect={ handleStarter }
 					onMessageAction={ handleMessageAction }
 					onClose={ closePanel }

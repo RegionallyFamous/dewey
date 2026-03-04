@@ -42,6 +42,12 @@ final class Dewey_REST_Controller {
 				'methods'             => WP_REST_Server::READABLE,
 				'permission_callback' => array( __CLASS__, 'can_status' ),
 				'callback'            => array( __CLASS__, 'status' ),
+				'args'                => array(
+					'debug' => array(
+						'type'    => 'boolean',
+						'default' => false,
+					),
+				),
 			)
 		);
 
@@ -99,31 +105,36 @@ final class Dewey_REST_Controller {
 	/**
 	 * @return WP_REST_Response|WP_Error
 	 */
-	public static function status() {
+	public static function status( WP_REST_Request $request ) {
 		$rate = self::enforce_rate_limit( 'status' );
 		if ( is_wp_error( $rate ) ) {
 			return $rate;
 		}
 
 		$settings = Dewey_Settings::get_all();
-		return rest_ensure_response(
-			array(
-				'ai_connected'     => dewey_ai_connection_status(),
-				'retrieval_mode'   => (string) ( $settings['retrieval_mode'] ?? 'core' ),
-				'index'            => Dewey_Indexer::status(),
-				'guardrails'       => array(
-					'search_max_results'  => Dewey_Settings::search_max_results(),
-					'search_max_content'  => Dewey_Settings::search_max_content(),
-					'response_max_tokens' => Dewey_Settings::response_max_tokens(),
-				),
-				'routes_available' => array(
-					'query'          => true,
-					'status'         => true,
-					'reindex'        => current_user_can( 'manage_options' ),
-					'confirm_action' => current_user_can( 'manage_options' ),
-				),
-			)
+		$response = array(
+			'ai_connected'     => dewey_ai_connection_status(),
+			'retrieval_mode'   => (string) ( $settings['retrieval_mode'] ?? 'core' ),
+			'index'            => Dewey_Indexer::status(),
+			'guardrails'       => array(
+				'search_max_results'  => Dewey_Settings::search_max_results(),
+				'search_max_content'  => Dewey_Settings::search_max_content(),
+				'response_max_tokens' => Dewey_Settings::response_max_tokens(),
+			),
+			'routes_available' => array(
+				'query'          => true,
+				'status'         => true,
+				'reindex'        => current_user_can( 'manage_options' ),
+				'confirm_action' => current_user_can( 'manage_options' ),
+			),
 		);
+
+		$debug_requested = (bool) $request->get_param( 'debug' );
+		if ( $debug_requested && current_user_can( 'manage_options' ) ) {
+			$response['ai_connection_debug'] = dewey_ai_connection_debug();
+		}
+
+		return rest_ensure_response( $response );
 	}
 
 	/**
