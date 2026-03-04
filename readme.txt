@@ -1,6 +1,6 @@
 === Dewey ===
 Contributors: regionallyfamous
-Tags: ai, content search, admin assistant, writing assistant, knowledge base
+Tags: ai, admin assistant, content management, writing assistant, productivity
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.1
@@ -8,54 +8,92 @@ Stable tag: 1.0.21
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Your best content is already written. Dewey helps your team query your archive in wp-admin and get grounded AI answers with citations.
+An AI assistant that lives in wp-admin. Ask questions about your content, navigate anywhere instantly, and get things done without leaving the panel.
 
 == Description ==
 
-Dewey brings your editorial memory into wp-admin so your team can move faster with less reinvention.
+Dewey sits in the corner of wp-admin as a small chat panel. Ask it something, and it goes to work — searching your content, navigating to the right screen, or creating something new, all without making you click through menus.
 
-When teams move fast, memory breaks: strong ideas get buried, duplicate posts appear, and voice drifts.
+**Ask questions about your content**
 
-Dewey gives editors a better workflow right now:
+Your archive is a goldmine that most teams never fully use. Dewey makes it searchable in plain English:
 
-* Ask plain-English questions in wp-admin — conversationally, like talking to a colleague.
-* Get AI answers grounded in your archive with inline citations and source snippets.
-* Follow-up question chips appear after every answer so the conversation stays natural.
-* Navigation command suggestions: type what you're looking for and get instant go-to chips for any wp-admin screen — no AI provider required.
-* Page-aware context: Dewey knows which screen you're on and offers relevant suggestions.
-* Post-aware context: when editing a post, Dewey knows the title, status, tags, and categories.
-* Persistent conversation: your chat thread survives page navigations in wp-admin.
-* Verified AI connection with a direct link to Settings > Connectors when a provider is needed.
+* "What have we written about email marketing?" — Dewey finds the relevant posts and surfaces exact excerpts with links.
+* "Have we covered this topic before?" — catch duplicates before you write them.
+* "What did we publish about onboarding last year?" — date-aware search cuts through the noise.
 
-The result is faster publishing, stronger consistency, and less reinvention.
+Answers are grounded in your actual content with inline citations. After every response, Dewey suggests follow-up questions so the conversation stays useful.
+
+**Navigate anywhere, instantly**
+
+No more digging through menus to find the right screen. Start typing in Dewey and go-to chips appear for any wp-admin destination — posts, pages, plugins, users, theme customizer, whatever. Just click and you're there. No AI provider required for this.
+
+**Get things done by asking**
+
+This is where Dewey goes beyond search. Tell it what you want and it does it:
+
+* "Create a new draft about summer recipes" — done. A draft appears and Dewey hands you the editor link.
+* "Show me my recent drafts" — Dewey lists them with direct edit links.
+* "Publish my onboarding post" — Dewey finds it, tells you what it found, and asks you to confirm before anything goes live.
+* "Trash the welcome page" — same: Dewey finds it, proposes the action, waits for your ok.
+
+Dewey only does what your WordPress role allows. If you can't publish, Dewey can't publish on your behalf.
+
+**Knows where you are**
+
+Dewey is aware of your current context — which screen you're on, which post you're editing, what that post's tags and status are. Ask "what should I write next?" and Dewey knows the post you're working on. Open it on the Users screen and it suggests user-relevant tasks.
+
+**Stays in the conversation**
+
+Your chat thread persists across page loads. Close the panel, navigate somewhere else, reopen it — the conversation is still there. Within four hours of your last session, Dewey greets you by picking up where you left off.
+
+**The small stuff that adds up**
+
+* Alt+Shift+D to open and close the panel from anywhere in wp-admin.
+* Copy button on every assistant message.
+* Retry button when something goes wrong — with a human explanation of what happened.
+* Relative timestamps on all messages.
+* Adjustable tone (casual or precise), verbosity (concise or detailed), and citation style — just ask.
 
 == Installation ==
 
-1. Upload the plugin files to the `/wp-content/plugins/dewey` directory, or install via the WordPress plugin screen.
+1. Upload the plugin to the `/wp-content/plugins/dewey` directory, or install via the WordPress plugin screen.
 2. Activate the plugin through the "Plugins" screen in WordPress.
-3. Configure your AI provider in `Settings > Connectors`.
-4. Open wp-admin and use the Dewey panel.
+3. Connect an AI provider in `Settings > Connectors`.
+4. Open wp-admin and click the Dewey icon in the bottom corner.
+
+Navigation commands and content actions work immediately. AI-backed questions and answers require a connected provider.
 
 == Frequently Asked Questions ==
 
 = Does Dewey send all my content to the AI provider? =
 
-No. Dewey retrieves relevant excerpts first and sends only the minimum context needed to answer your question.
+No. Dewey retrieves relevant excerpts from your archive first, then sends only the minimum context needed to answer your question. Your full content never leaves your server.
+
+= Can Dewey edit or delete my content without asking? =
+
+No. Dewey proposes destructive actions (trash, publish) and waits for you to confirm before anything is changed. It also respects your WordPress role — if your account can't do something, Dewey can't do it either.
+
+= Do I need an AI provider for everything? =
+
+No. Navigation commands (the go-to chips) and content actions like creating drafts work without any AI provider connected. You only need a provider for open-ended questions and answers.
 
 = Who can use Dewey? =
 
-Dewey runs in wp-admin for authenticated users with appropriate capabilities. Query/status routes are for editors, while maintenance actions like reindex are admin-only.
+Any authenticated wp-admin user with at least the editor capability. Actions that affect site-wide settings (like reindexing) are restricted to admins.
+
+= What AI providers does Dewey support? =
+
+Dewey works with any provider configured through WordPress's built-in Settings > Connectors interface.
 
 == Changelog ==
 
 = 1.0.21 =
-* Write actions: Dewey can now create draft posts and pages, list recent content, and propose trash/publish operations — all gated by the logged-in user's WordPress capabilities. Destructive actions require explicit confirmation before executing.
-* New REST endpoint `/dewey/v1/execute-action` with HMAC-signed tokens for confirmed content changes (trash, publish).
-* Intent router extended with action patterns for create/list/trash/publish recognized before AI is consulted.
-* WordPress Knowledge Pack: Dewey now has a bundled reference knowledge base covering core WordPress topics (hooks, CPTs, taxonomies, REST API, AJAX, security, cron, Options API, metadata, WP-CLI, block development, and more). When your question maps to a documented topic, relevant excerpts are injected into the AI prompt for more reliable answers.
+* Write actions: ask Dewey to create a draft post or page, list your recent content, trash a post, or publish a draft — it does it. Destructive actions (trash, publish) always wait for your confirmation first.
+* All write actions respect your WordPress role. Dewey cannot do anything your account cannot do.
 
 = 1.0.20 =
-* Navigation command suggestions: as you type in the Dewey panel, fuzzy-matched go-to chips appear for any wp-admin screen. Powered by Fuse.js client-side matching against a 40-command registry and dynamically scraped sidebar items. Works without an AI provider connected.
+* Navigation command suggestions: start typing and go-to chips appear for any wp-admin screen. No AI provider needed — works instantly from the first keystroke.
 
 = 1.0.19 =
 * Retrieval resilience: no-hit archive lookups now trigger targeted refinement prompts with possible title suggestions instead of dead-end responses.
