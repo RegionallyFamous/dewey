@@ -203,13 +203,6 @@ final class Dewey_Engine {
 			if ( method_exists( $prompt, 'using_max_tokens' ) ) {
 				$prompt = $prompt->using_max_tokens( Dewey_Settings::response_max_tokens() );
 			}
-			if ( method_exists( $prompt, 'using_model_preference' ) ) {
-				$prompt = $prompt->using_model_preference(
-					array( 'google', 'gemini-3-pro-preview' ),
-					array( 'anthropic', 'claude-sonnet-4-5' ),
-					array( 'openai', 'gpt-5.1' )
-				);
-			}
 
 			$text = $prompt->generate_text();
 			if ( is_wp_error( $text ) ) {

@@ -4,6 +4,14 @@
  * Lightweight static Dewey mark for mobile FAB usage.
  */
 
+const DEWEY_BASE_900 = 'var(--dewey-base-900, #1b4332)';
+const DEWEY_BASE_700 = 'var(--dewey-base-700, #2d6a4f)';
+const DEWEY_BASE_600 = 'var(--dewey-base-600, #3d8a6a)';
+const DEWEY_PAPER_100 = 'var(--dewey-paper-100, #fdf6e3)';
+const DEWEY_PAPER_200 = 'var(--dewey-paper-200, #f5edd6)';
+const DEWEY_PAPER_LINE = 'var(--dewey-paper-line, #c4b898)';
+const DEWEY_RIBBON = 'var(--dewey-ribbon, #8b1e2e)';
+
 export default function SimpleDeweyMark() {
 	return (
 		<svg
@@ -21,8 +29,8 @@ export default function SimpleDeweyMark() {
 					x2="1"
 					y2="1"
 				>
-					<stop offset="0%" stopColor="#2d6a4f" />
-					<stop offset="100%" stopColor="#1b4332" />
+					<stop offset="0%" stopColor={ DEWEY_BASE_700 } />
+					<stop offset="100%" stopColor={ DEWEY_BASE_900 } />
 				</linearGradient>
 			</defs>
 			<circle cx="32" cy="32" r="30" fill="#ffffff" stroke="#dcdcde" />
@@ -34,28 +42,49 @@ export default function SimpleDeweyMark() {
 				rx="7"
 				fill="url(#dewey-mini-cover)"
 			/>
-			<rect x="21" y="18" width="22" height="16" rx="5" fill="#3d8a6a" />
-			<circle cx="28" cy="26" r="4.6" fill="#fdf6e3" />
-			<circle cx="36" cy="26" r="4.6" fill="#fdf6e3" />
-			<circle cx="28" cy="26" r="2.2" fill="#1b4332" />
-			<circle cx="36" cy="26" r="2.2" fill="#1b4332" />
+			<rect
+				x="21"
+				y="18"
+				width="22"
+				height="16"
+				rx="5"
+				fill={ DEWEY_BASE_600 }
+			/>
+			<circle cx="28" cy="26" r="4.6" fill={ DEWEY_PAPER_100 } />
+			<circle cx="36" cy="26" r="4.6" fill={ DEWEY_PAPER_100 } />
+			<circle cx="28" cy="26" r="2.2" fill={ DEWEY_BASE_900 } />
+			<circle cx="36" cy="26" r="2.2" fill={ DEWEY_BASE_900 } />
 			<path
 				d="M25 33 C28 36 36 36 39 33"
-				stroke="#fdf6e3"
+				stroke={ DEWEY_PAPER_100 }
 				strokeWidth="2.2"
 				fill="none"
 				strokeLinecap="round"
 			/>
-			<rect x="19" y="37" width="26" height="10" rx="2" fill="#f5edd6" />
+			<rect
+				x="19"
+				y="37"
+				width="26"
+				height="10"
+				rx="2"
+				fill={ DEWEY_PAPER_200 }
+			/>
 			<line
 				x1="32"
 				y1="37"
 				x2="32"
 				y2="47"
-				stroke="#c4b898"
+				stroke={ DEWEY_PAPER_LINE }
 				strokeWidth="1.2"
 			/>
-			<rect x="44" y="12" width="4" height="16" rx="1.2" fill="#8b1e2e" />
+			<rect
+				x="44"
+				y="12"
+				width="4"
+				height="16"
+				rx="1.2"
+				fill={ DEWEY_RIBBON }
+			/>
 		</svg>
 	);
 }

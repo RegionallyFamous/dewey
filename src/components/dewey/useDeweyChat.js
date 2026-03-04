@@ -34,7 +34,11 @@ function emitDebugLog( label, payload ) {
 	if ( ! isDebugEnabled() || ! window.console ) {
 		return;
 	}
-	window.console.info( `[Dewey AI Debug] ${ label }`, payload );
+	const serialized =
+		typeof payload === 'string'
+			? payload
+			: JSON.stringify( payload, null, 2 );
+	window.console.info( `[Dewey AI Debug] ${ label } ${ serialized }` );
 }
 
 export function getInitialOpenState() {

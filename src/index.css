@@ -16,6 +16,13 @@
 	--dewey-accent: var(--wp-admin-theme-color, #2271b1);
 	--dewey-accent-dark: var(--wp-admin-theme-color-darker-10, #135e96);
 	--dewey-accent-soft: color-mix(in srgb, var(--dewey-accent) 18%, transparent);
+	--dewey-base-900: color-mix(in srgb, var(--dewey-accent) 38%, #000);
+	--dewey-base-700: color-mix(in srgb, var(--dewey-accent) 70%, #000);
+	--dewey-base-600: color-mix(in srgb, var(--dewey-accent) 82%, #fff);
+	--dewey-paper-100: color-mix(in srgb, var(--dewey-accent) 8%, #fff);
+	--dewey-paper-200: color-mix(in srgb, var(--dewey-accent) 14%, #fff);
+	--dewey-paper-line: color-mix(in srgb, var(--dewey-accent) 24%, #8a7d63);
+	--dewey-ribbon: color-mix(in srgb, var(--dewey-accent) 30%, #8b1e2e);
 	--dewey-safe-right: max(12px, env(safe-area-inset-right, 0px));
 	--dewey-safe-left: max(12px, env(safe-area-inset-left, 0px));
 	--dewey-safe-bottom: max(12px, env(safe-area-inset-bottom, 0px));
