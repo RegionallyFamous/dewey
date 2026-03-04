@@ -13,7 +13,9 @@ import {
 } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import {
+	DEWEY_JOKES,
 	DEWEY_SOUL_SYSTEM_PROMPT,
+	EASTER_EGGS,
 	FIRST_OPEN_MESSAGE,
 	INVESTIGATION_MESSAGE,
 	NO_AI_MESSAGE,
@@ -190,7 +192,21 @@ function createWelcomeMessage() {
 			? window.deweyConfig.currentUser.trim()
 			: null;
 
-	const greeting = getTimeOfDayGreeting( name ) ?? FIRST_OPEN_MESSAGE;
+	let greeting = getTimeOfDayGreeting( name ) ?? FIRST_OPEN_MESSAGE;
+
+	// Append date-aware flavor text when today is special.
+	const dateFlavor = getDateFlavorText();
+	if ( dateFlavor ) {
+		greeting = `${ greeting } ${ dateFlavor }`;
+	}
+
+	// On dark mode (first open only) — Dewey notices.
+	const isDark =
+		typeof window.matchMedia === 'function' &&
+		window.matchMedia( '(prefers-color-scheme: dark)' ).matches;
+	if ( isDark ) {
+		greeting = `${ greeting } Nice color scheme. Very me.`;
+	}
 
 	// If the current wp-admin screen is recognized, append a contextual hint and
 	// swap in page-specific action chips so the first suggestion is always relevant.
@@ -298,6 +314,89 @@ function normalizeUserInput( value ) {
 	}
 
 	return value.replace( CONTROL_CHARS_RE, '' ).slice( 0, MAX_INPUT_CHARS );
+}
+
+/**
+ * Check the user's question against the easter egg trigger list.
+ * Returns `{ egg, response }` on match, or `null` if no egg fires.
+ *
+ * @param {string} question  Normalized user input.
+ * @param {number} jokeIndex Current joke rotation index.
+ * @return {{ egg: Object, response: string }|null} Match result or null.
+ */
+function checkEasterEgg( question, jokeIndex ) {
+	const q = question.trim().toLowerCase();
+	if ( ! q ) {
+		return null;
+	}
+
+	for ( const egg of EASTER_EGGS ) {
+		const matched =
+			egg.matchType === 'exact'
+				? egg.matchers.some( ( m ) => q === m.toLowerCase() )
+				: egg.matchers.some( ( m ) => q.includes( m.toLowerCase() ) );
+
+		if ( ! matched ) {
+			continue;
+		}
+
+		if ( egg.special === 'joke' ) {
+			const joke = DEWEY_JOKES[ jokeIndex % DEWEY_JOKES.length ];
+			return { egg, response: joke };
+		}
+
+		if ( egg.special === 'roast' ) {
+			const roasts = [
+				"Alright, let's do this.\n\nYour site has posts. Some are great. Some have been sitting in draft since before the pandemic — you know who you are.\n\nYour tag cloud looks like someone sneezed on a keyboard. And I counted at least one category called 'Uncategorized' that has, ironically, 12 posts in it.\n\nI'm kidding. Mostly. You're doing fine. 💚",
+				"Okay. Roast mode engaged.\n\nThe good news: your content exists. The bad news: some of it exists in a state quantum physicists call 'draft limbo' — neither published nor deleted, just... haunting the database.\n\nYour most-used tag appears to be 'General'. Bold branding choice.\n\nStill — the site is alive and kicking. That puts you ahead of most.",
+				"You asked for it.\n\nSomebody here has 47 posts. 12 are drafts. One has been a draft since the early days — you know which one. The one with the title 'Final version (2)'. Never published. Classic.\n\nThe site's strongest category is also its most vague. The weakest posts have titles that make me feel things I wasn't built to feel.\n\nBut hey — it's your archive. Own it.",
+			];
+			const roast = roasts[ Math.floor( Math.random() * roasts.length ) ];
+			return { egg, response: roast };
+		}
+
+		return { egg, response: egg.response };
+	}
+
+	return null;
+}
+
+/**
+ * Return a date-aware flavor string to append to the welcome greeting,
+ * or null if today is nothing special.
+ *
+ * @return {string|null} Flavor text, or null.
+ */
+function getDateFlavorText() {
+	const now = new Date();
+	const month = now.getMonth() + 1; // 1-based
+	const day = now.getDate();
+
+	// April Fools' Day
+	if ( month === 4 && day === 1 ) {
+		return "Good news: we just shipped Dewey 2.0 with 500 new features and zero bugs. Just kidding. What's up?";
+	}
+
+	// WordPress birthday — May 27 (first release: 2003-05-27)
+	if ( month === 5 && day === 27 ) {
+		return 'Also — happy WordPress birthday! \uD83C\uDF82 Twenty-something years of powering 40% of the internet. Wild, right? Ask me anything to celebrate.';
+	}
+
+	// Day-of-week and time checks — only evaluated when month/day don't short-circuit.
+	const dow = now.getDay(); // 0 = Sunday
+	const hour = now.getHours();
+
+	// Friday afternoon
+	if ( dow === 5 && hour >= 14 ) {
+		return "It's almost the weekend. Let's make this quick.";
+	}
+
+	// Monday morning
+	if ( dow === 1 && hour < 12 ) {
+		return 'Ugh, Mondays. What disaster are we fixing first?';
+	}
+
+	return null;
 }
 
 /**
@@ -479,9 +578,13 @@ export function useDeweyChat() {
 		detectAiConnection()
 	);
 	const [ connectionDebug, setConnectionDebug ] = useState( null );
+	const [ fabEasterEgg, setFabEasterEgg ] = useState( null );
+	const [ showConfetti, setShowConfetti ] = useState( false );
+	const [ wpDieActive, setWpDieActive ] = useState( false );
 	const inputRef = useRef( null );
 	const lastSubmitAtRef = useRef( 0 );
 	const lastQuestionRef = useRef( '' );
+	const jokeIndexRef = useRef( 0 );
 	const lastConnectionRefreshAtRef = useRef( 0 );
 	const connectionRefreshInFlightRef = useRef( false );
 	const { deweyState, deweyHandlers } = useDewey();
@@ -683,6 +786,37 @@ export function useDeweyChat() {
 		return () => window.removeEventListener( 'keydown', onKeyDown );
 	}, [] );
 
+	// Konami code easter egg: ↑↑↓↓←→←→BA triggers confetti.
+	useEffect( () => {
+		const KONAMI = [
+			'ArrowUp',
+			'ArrowUp',
+			'ArrowDown',
+			'ArrowDown',
+			'ArrowLeft',
+			'ArrowRight',
+			'ArrowLeft',
+			'ArrowRight',
+			'b',
+			'a',
+		];
+		let position = 0;
+		const onKeyDown = ( event ) => {
+			if ( event.key === KONAMI[ position ] ) {
+				position++;
+				if ( position === KONAMI.length ) {
+					position = 0;
+					setShowConfetti( true );
+					setTimeout( () => setShowConfetti( false ), 4000 );
+				}
+			} else {
+				position = event.key === KONAMI[ 0 ] ? 1 : 0;
+			}
+		};
+		window.addEventListener( 'keydown', onKeyDown );
+		return () => window.removeEventListener( 'keydown', onKeyDown );
+	}, [] );
+
 	const clearConversation = useCallback( () => {
 		try {
 			window.localStorage.removeItem( STORAGE_KEYS.messages );
@@ -724,6 +858,39 @@ export function useDeweyChat() {
 
 			addMessage( 'user', question );
 			deweyHandlers.onQueryStart();
+
+			// --- Easter egg interceptor ---
+			const eggMatch = checkEasterEgg( question, jokeIndexRef.current );
+			if ( eggMatch ) {
+				// Advance joke rotation index for next time.
+				if ( eggMatch.egg.special === 'joke' ) {
+					jokeIndexRef.current =
+						( jokeIndexRef.current + 1 ) % DEWEY_JOKES.length;
+				}
+
+				// Coffee: trigger FAB jitter for 3 seconds.
+				if ( eggMatch.egg.special === 'coffee' ) {
+					setFabEasterEgg( 'coffee' );
+					setTimeout( () => setFabEasterEgg( null ), 3000 );
+				}
+
+				// wp_die(): fade panel out then back in with a punchline.
+				if ( eggMatch.egg.special === 'wp_die' ) {
+					setWpDieActive( true );
+					setTimeout( () => {
+						setWpDieActive( false );
+						deweyHandlers.onAnswerReady( 1 );
+						addMessage( 'assistant', '\u2026just kidding.' );
+					}, 1500 );
+					return;
+				}
+
+				if ( eggMatch.response ) {
+					deweyHandlers.onAnswerReady( 1 );
+					addMessage( 'assistant', eggMatch.response );
+				}
+				return;
+			}
 
 			if ( ! isAiConnected && ! getApiConfig() ) {
 				deweyHandlers.onNoResults();
@@ -985,6 +1152,9 @@ export function useDeweyChat() {
 		deweyState,
 		speech,
 		inputRef,
+		fabEasterEgg,
+		showConfetti,
+		wpDieActive,
 		setInputValue: ( nextValue ) =>
 			setInputValue( normalizeUserInput( nextValue ) ),
 		openPanel,

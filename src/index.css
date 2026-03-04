@@ -946,3 +946,148 @@
 		animation: none;
 	}
 }
+
+/* ─── Easter Eggs ─────────────────────────────────────────────────────────────── */
+
+/* FAB spin — triggered on 10 rapid clicks */
+@keyframes dewey-fab-spin {
+
+	from {
+		transform: rotate(0deg);
+	}
+
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.dewey-fab--spin {
+	animation: dewey-fab-spin 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* FAB jitter — triggered by typing "coffee" */
+@keyframes dewey-fab-jitter {
+
+	0%,
+	100% {
+		transform: translateX(0);
+	}
+
+	20% {
+		transform: translateX(-5px) rotate(-3deg);
+	}
+
+	40% {
+		transform: translateX(5px) rotate(3deg);
+	}
+
+	60% {
+		transform: translateX(-4px) rotate(-2deg);
+	}
+
+	80% {
+		transform: translateX(4px) rotate(2deg);
+	}
+}
+
+.dewey-fab--caffeinated {
+	animation: dewey-fab-jitter 0.25s ease-in-out infinite;
+}
+
+/* FAB sleepy speech bubble — shown on 3-second long-press */
+.dewey-fab__sleepy {
+	position: absolute;
+	bottom: calc(100% + 10px);
+	right: 0;
+	background: #fff;
+	color: #1d2327;
+	font-size: 12px;
+	line-height: 1.4;
+	padding: 6px 10px;
+	border-radius: 8px;
+	white-space: nowrap;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+	pointer-events: none;
+	animation: dewey-panel-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.dewey-fab__sleepy::after {
+	content: "";
+	position: absolute;
+	bottom: -5px;
+	right: 18px;
+	width: 10px;
+	height: 10px;
+	background: #fff;
+	transform: rotate(45deg);
+	box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Panel wp_die() easter egg — fades out then back in */
+@keyframes dewey-panel-die {
+
+	0% {
+		opacity: 1;
+		transform: scale(1);
+	}
+
+	50% {
+		opacity: 0;
+		transform: scale(0.95);
+	}
+
+	100% {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+.dewey-panel--dying {
+	animation: dewey-panel-die 1.5s ease-in-out forwards;
+	pointer-events: none;
+}
+
+/* Confetti burst — triggered by Konami code */
+.dewey-confetti {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	overflow: hidden;
+	pointer-events: none;
+	z-index: 10;
+}
+
+@keyframes dewey-confetti-fall {
+
+	0% {
+		transform: translateY(-10px) rotate(0deg);
+		opacity: 1;
+	}
+
+	100% {
+		transform: translateY(350px) rotate(720deg);
+		opacity: 0;
+	}
+}
+
+.dewey-confetti__particle {
+	position: absolute;
+	top: -8px;
+	border-radius: 2px;
+	animation: dewey-confetti-fall linear forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+	.dewey-fab--spin,
+	.dewey-fab--caffeinated,
+	.dewey-panel--dying {
+		animation: none;
+	}
+
+	.dewey-confetti__particle {
+		display: none;
+	}
+}

@@ -23,6 +23,9 @@ export default function App() {
 		isAiConnected,
 		connectionDebug,
 		citationStyle,
+		fabEasterEgg,
+		showConfetti,
+		wpDieActive,
 		inputRef,
 		setInputValue,
 		togglePanel,
@@ -56,7 +59,11 @@ export default function App() {
 
 	return (
 		<div className="dewey-app">
-			<DeweyFab isOpen={ isOpen } onToggle={ togglePanel } />
+			<DeweyFab
+				isOpen={ isOpen }
+				onToggle={ togglePanel }
+				easterEggState={ fabEasterEgg }
+			/>
 			{ isOpen && (
 				<DeweyPanel
 					messages={ messages }
@@ -64,11 +71,13 @@ export default function App() {
 					isSubmitting={ isSubmitting }
 					isAiConnected={ isAiConnected }
 					connectionDebug={ connectionDebug }
+					citationStyle={ citationStyle }
+					showConfetti={ showConfetti }
+					wpDieActive={ wpDieActive }
 					onStarterSelect={ handleStarter }
 					onMessageAction={ handleMessageAction }
 					onClose={ closePanel }
 					onClearConversation={ clearConversation }
-					citationStyle={ citationStyle }
 					onSubmit={ handleSubmitOrNavigate }
 					inputRef={ inputRef }
 					inputValue={ inputValue }

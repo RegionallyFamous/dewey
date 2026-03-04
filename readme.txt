@@ -4,7 +4,7 @@ Tags: ai, admin assistant, content management, writing assistant, productivity
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 1.0.21
+Stable tag: 1.0.22
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,6 +87,15 @@ Any authenticated wp-admin user with at least the editor capability. Actions tha
 Dewey works with any provider configured through WordPress's built-in Settings > Connectors interface.
 
 == Changelog ==
+
+= 1.0.22 =
+* Easter eggs: 14 hidden responses to secret phrases (sudo, hello world, the loop haiku, wp_die(), coffee jitter, konami, 42, meaning of life, better than ChatGPT, who made you, tell me a joke, roast my site, are you AI, what can you do).
+* Date-aware greetings: April Fools' Day, WordPress Birthday (May 27), Friday afternoon, Monday morning flavour text injected into the welcome message.
+* Dark mode greeting: Dewey notices and comments on the colour scheme on first open.
+* Konami code: ↑↑↓↓←→←→BA triggers a confetti burst in the panel.
+* FAB easter eggs: 10 rapid clicks triggers a spin animation; holding the FAB for 3 seconds shows a sleepy speech bubble.
+* Coffee/☕ trigger: typing "coffee" makes the FAB jitter with caffeinated energy.
+* wp_die() trigger: the panel fades out and back in with a punchline.
 
 = 1.0.21 =
 * Write actions: ask Dewey to create a draft post or page, list your recent content, trash a post, or publish a draft — it does it. Destructive actions (trash, publish) always wait for your confirmation first.

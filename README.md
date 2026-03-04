@@ -64,6 +64,13 @@ Close the panel, navigate to a different screen, come back — your thread is st
 - Every answer has a copy button
 - If something goes wrong, a retry button appears with a plain explanation of what happened
 - Adjust Dewey's tone, verbosity, and citation style just by asking
+- There are easter eggs. You'll find them.
+
+---
+
+## Easter eggs
+
+Dewey has a personality, and a few hidden layers. Some are typed commands, some are date-aware, and at least one involves the Konami code. Part of the fun is finding them.
 
 ---
 

@@ -2,10 +2,57 @@
  * DeweyPanel.jsx
  */
 
-import { memo, useEffect, useMemo } from '@wordpress/element';
+import { memo, useEffect, useMemo, useRef } from '@wordpress/element';
 import { Button, TextControl } from '@wordpress/components';
 import { __ } from '@wordpress/i18n';
 import MessageList from './MessageList';
+
+const CONFETTI_COLORS = [
+	'#2271b1',
+	'#d63638',
+	'#f0c33c',
+	'#00a32a',
+	'#f86368',
+	'#72aee6',
+	'#8c8f94',
+	'#3858e9',
+];
+
+/**
+ * Renders a burst of confetti particles. Each particle gets randomized
+ * position, color, size, and animation delay, all seeded once on mount.
+ */
+function ConfettiBurst() {
+	const particles = useRef(
+		Array.from( { length: 30 }, ( _, i ) => ( {
+			key: i,
+			left: Math.random() * 100,
+			color: CONFETTI_COLORS[ i % CONFETTI_COLORS.length ],
+			size: 6 + Math.random() * 6,
+			delay: Math.random() * 0.6,
+			duration: 1.2 + Math.random() * 1.0,
+		} ) )
+	).current;
+
+	return (
+		<div className="dewey-confetti" aria-hidden="true">
+			{ particles.map( ( p ) => (
+				<div
+					key={ p.key }
+					className="dewey-confetti__particle"
+					style={ {
+						left: `${ p.left }%`,
+						backgroundColor: p.color,
+						width: p.size,
+						height: p.size,
+						animationDelay: `${ p.delay }s`,
+						animationDuration: `${ p.duration }s`,
+					} }
+				/>
+			) ) }
+		</div>
+	);
+}
 
 function resolveConnectorsUrl() {
 	// PHP injects the canonical URL via admin_url() + wp_json_encode.
@@ -23,6 +70,8 @@ function DeweyPanel( {
 	isSubmitting,
 	isAiConnected,
 	citationStyle,
+	showConfetti,
+	wpDieActive,
 	onStarterSelect,
 	onMessageAction,
 	onClose,
@@ -54,11 +103,14 @@ function DeweyPanel( {
 	return (
 		<section
 			id="dewey-panel"
-			className="dewey-panel"
+			className={ `dewey-panel${
+				wpDieActive ? ' dewey-panel--dying' : ''
+			}` }
 			role="dialog"
 			aria-modal="false"
 			aria-labelledby={ titleId }
 		>
+			{ showConfetti && <ConfettiBurst /> }
 			<header className="dewey-panel__header">
 				<div id={ titleId } className="dewey-panel__title">
 					<span>{ __( 'Ask Dewey', 'dewey' ) }</span>

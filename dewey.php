@@ -3,7 +3,7 @@
  * Plugin Name: Dewey AI Search Assistant
  * Plugin URI: https://github.com/regionally-famous/dewey
  * Description: Dewey brings live archive query and AI answers into wp-admin, with citations and built-in guardrails powered by WordPress 7.0 core capabilities.
- * Version: 1.0.21
+ * Version: 1.0.22
  * Requires at least: 7.0
  * Requires PHP: 8.1
  * Author: Regionally Famous
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'DEWEY_VERSION', '1.0.21' );
+define( 'DEWEY_VERSION', '1.0.22' );
 define( 'DEWEY_PLUGIN_FILE', __FILE__ );
 define( 'DEWEY_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DEWEY_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
