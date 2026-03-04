@@ -11,6 +11,8 @@ declare(strict_types=1);
 defined( 'ABSPATH' ) || exit;
 
 final class Dewey_Engine {
+	const QUERY_TELEMETRY_OPTION_KEY = 'dewey_query_telemetry';
+
 	/**
 	 * @param string                              $question
 	 * @param string                              $assistant_system_prompt
@@ -61,6 +63,18 @@ final class Dewey_Engine {
 				(string) ( $retrieval['retrieval_mode'] ?? 'core' )
 			);
 			$fallback = self::build_refinement_response( $question, $suggestions );
+			self::record_query_telemetry(
+				array(
+					'total_queries'         => 1,
+					'retrieval_hits'        => 0,
+					'retrieval_misses'      => 1,
+					'refinement_fallbacks'  => 1,
+					'suggestions_presented' => empty( $suggestions ) ? 0 : 1,
+					'suggestion_count'      => count( $suggestions ),
+					'title_fallback_hits'   => 0,
+					'date_bias_applied'     => ! empty( $retrieval['date_bias_applied'] ) ? 1 : 0,
+				)
+			);
 			return array(
 				'answer'     => $fallback['answer'],
 				'follow_ups' => $fallback['follow_ups'],
@@ -78,6 +92,18 @@ final class Dewey_Engine {
 		if ( is_wp_error( $answer_result ) ) {
 			return $answer_result;
 		}
+		self::record_query_telemetry(
+			array(
+				'total_queries'         => 1,
+				'retrieval_hits'        => count( $retrieval['citations'] ) > 0 ? 1 : 0,
+				'retrieval_misses'      => count( $retrieval['citations'] ) > 0 ? 0 : 1,
+				'refinement_fallbacks'  => 0,
+				'suggestions_presented' => 0,
+				'suggestion_count'      => 0,
+				'title_fallback_hits'   => ! empty( $retrieval['title_fallback_used'] ) ? 1 : 0,
+				'date_bias_applied'     => ! empty( $retrieval['date_bias_applied'] ) ? 1 : 0,
+			)
+		);
 
 		return array(
 			'answer'     => $answer_result['answer'],
@@ -109,6 +135,7 @@ final class Dewey_Engine {
 		// ranks higher than one that only matches a single term.
 		$merged    = array();
 		$max_total = Dewey_Settings::search_max_results();
+		$title_fallback_used = false;
 
 		foreach ( $search_terms as $term ) {
 			$term_results = self::search_with_mode( $term, $effective_mode );
@@ -133,6 +160,7 @@ final class Dewey_Engine {
 
 		if ( empty( $merged ) ) {
 			$title_fallback = self::search_title_fallback( $question, $effective_mode, $max_total );
+			$title_fallback_used = ! empty( $title_fallback );
 			foreach ( $title_fallback as $result ) {
 				$post_id = (int) ( $result['post_id'] ?? 0 );
 				if ( $post_id <= 0 ) {
@@ -143,7 +171,9 @@ final class Dewey_Engine {
 		}
 
 		if ( ! empty( $merged ) ) {
-			self::apply_date_bias( $merged, $question );
+			$date_bias_applied = self::apply_date_bias( $merged, $question );
+		} else {
+			$date_bias_applied = false;
 		}
 
 		uasort(
@@ -185,6 +215,8 @@ final class Dewey_Engine {
 			'retrieval_mode' => $effective_mode,
 			'citations'      => $citations,
 			'context_blocks' => $contexts,
+			'title_fallback_used' => $title_fallback_used,
+			'date_bias_applied'   => $date_bias_applied,
 		);
 	}
 
@@ -358,12 +390,12 @@ final class Dewey_Engine {
 	 *
 	 * @param array<int,array<string,mixed>> $merged
 	 * @param string                         $question
-	 * @return void
+	 * @return bool Whether score adjustments were applied.
 	 */
-	private static function apply_date_bias( array &$merged, string $question ): void {
+	private static function apply_date_bias( array &$merged, string $question ): bool {
 		$hint = self::extract_date_hint( $question );
 		if ( empty( $hint ) ) {
-			return;
+			return false;
 		}
 
 		foreach ( $merged as &$result ) {
@@ -393,6 +425,7 @@ final class Dewey_Engine {
 			$result['score'] = $score;
 		}
 		unset( $result );
+		return true;
 	}
 
 	/**
@@ -927,17 +960,68 @@ final class Dewey_Engine {
 	 * @return array<int,string>
 	 */
 	private static function build_title_suggestions( string $question, string $mode ): array {
-		$candidates = self::search_title_fallback( $question, $mode, 6 );
+		$phrase = self::extract_title_phrase( $question );
+		if ( '' === $phrase ) {
+			return array();
+		}
+
+		$candidates = self::search_with_mode( $phrase, $mode );
 		$titles     = array();
 		foreach ( $candidates as $candidate ) {
 			$title = trim( (string) ( $candidate['title'] ?? '' ) );
 			if ( '' === $title ) {
 				continue;
 			}
+			$overlap = self::token_overlap_score( strtolower( $title ), strtolower( $phrase ) );
+			if ( $overlap < 0.2 && false === strpos( strtolower( $title ), strtolower( $phrase ) ) ) {
+				continue;
+			}
 			$titles[] = $title;
 		}
 
 		return array_values( array_slice( array_unique( $titles ), 0, 3 ) );
+	}
+
+	/**
+	 * Retrieve aggregate query telemetry counters for status/debug output.
+	 *
+	 * @return array<string,mixed>
+	 */
+	public static function get_query_telemetry(): array {
+		$saved = get_option( self::QUERY_TELEMETRY_OPTION_KEY, array() );
+		if ( ! is_array( $saved ) ) {
+			$saved = array();
+		}
+
+		return wp_parse_args(
+			$saved,
+			array(
+				'total_queries'         => 0,
+				'retrieval_hits'        => 0,
+				'retrieval_misses'      => 0,
+				'refinement_fallbacks'  => 0,
+				'suggestions_presented' => 0,
+				'suggestion_count'      => 0,
+				'title_fallback_hits'   => 0,
+				'date_bias_applied'     => 0,
+				'last_updated'          => '',
+			)
+		);
+	}
+
+	/**
+	 * Increment telemetry counters for retrieval behaviour.
+	 *
+	 * @param array<string,int> $increments
+	 * @return void
+	 */
+	private static function record_query_telemetry( array $increments ): void {
+		$current = self::get_query_telemetry();
+		foreach ( $increments as $key => $delta ) {
+			$current[ $key ] = max( 0, (int) ( $current[ $key ] ?? 0 ) + (int) $delta );
+		}
+		$current['last_updated'] = gmdate( 'c' );
+		update_option( self::QUERY_TELEMETRY_OPTION_KEY, $current );
 	}
 
 	/**

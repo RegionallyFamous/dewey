@@ -14,6 +14,7 @@ final class Dewey_Indexer {
 	const INDEX_OPTION_KEY  = 'dewey_index_data';
 	const STATUS_OPTION_KEY = 'dewey_index_status';
 	const REBUILD_BATCH_SIZE = 300;
+	const INTEGRITY_CACHE_KEY = 'dewey_index_integrity_cache';
 
 	/**
 	 * Number of words to store per post. Storing 600 words gives the AI
@@ -85,12 +86,16 @@ final class Dewey_Indexer {
 
 				$snippet    = wp_trim_words( $full_text, self::CONTENT_WORDS, '…' );
 				$word_count = str_word_count( $snippet );
+				$tags_text  = self::terms_to_text( (int) $post->ID, 'post_tag' );
+				$cats_text  = self::terms_to_text( (int) $post->ID, 'category' );
 
 				$items[] = array(
 					'post_id'    => (int) $post->ID,
 					'title'      => get_the_title( $post ),
 					'permalink'  => get_permalink( $post ),
 					'snippet'    => $snippet,
+					'tags_text'  => $tags_text,
+					'cats_text'  => $cats_text,
 					'word_count' => $word_count,
 					'modified'   => get_post_modified_time( 'c', true, $post ),
 				);
@@ -117,6 +122,7 @@ final class Dewey_Indexer {
 		);
 
 		update_option( self::INDEX_OPTION_KEY, $payload );
+		delete_transient( self::INTEGRITY_CACHE_KEY );
 		self::update_status(
 			array(
 				'state'          => 'idle',
@@ -144,6 +150,7 @@ final class Dewey_Indexer {
 		if ( is_array( $index ) && is_array( $index['items'] ?? null ) ) {
 			$count = count( $index['items'] );
 		}
+		$generated_at = is_array( $index ) ? (string) ( $index['generated_at'] ?? '' ) : '';
 
 		return wp_parse_args(
 			$status,
@@ -153,6 +160,7 @@ final class Dewey_Indexer {
 				'last_error'     => '',
 				'indexed_count'  => $count,
 				'last_completed' => '',
+				'generated_at'   => $generated_at,
 			)
 		);
 	}
@@ -205,6 +213,8 @@ final class Dewey_Indexer {
 
 			$title_lower   = strtolower( (string) ( $item['title'] ?? '' ) );
 			$snippet_lower = strtolower( (string) ( $item['snippet'] ?? '' ) );
+			$tags_lower    = strtolower( (string) ( $item['tags_text'] ?? '' ) );
+			$cats_lower    = strtolower( (string) ( $item['cats_text'] ?? '' ) );
 			$doc_words     = max( 1, (int) ( $item['word_count'] ?? str_word_count( $snippet_lower ) ) );
 			$length_norm   = 0.75 + 0.25 * ( $doc_words / $avg_doc_length );
 
@@ -212,14 +222,18 @@ final class Dewey_Indexer {
 			foreach ( $terms as $term ) {
 				$title_tf  = substr_count( $title_lower, $term );
 				$body_tf   = substr_count( $snippet_lower, $term );
+				$tags_tf   = substr_count( $tags_lower, $term );
+				$cats_tf   = substr_count( $cats_lower, $term );
 
-				if ( 0 === $title_tf && 0 === $body_tf ) {
+				if ( 0 === $title_tf && 0 === $body_tf && 0 === $tags_tf && 0 === $cats_tf ) {
 					continue;
 				}
 
 				$title_score = 3.0 * log( 1.0 + $title_tf );
 				$body_score  = log( 1.0 + $body_tf );
-				$doc_score  += ( $title_score + $body_score ) / $length_norm;
+				$tags_score  = 1.7 * log( 1.0 + $tags_tf );
+				$cats_score  = 1.4 * log( 1.0 + $cats_tf );
+				$doc_score  += ( $title_score + $body_score + $tags_score + $cats_score ) / $length_norm;
 			}
 
 			if ( $doc_score > 0.0 ) {
@@ -236,6 +250,79 @@ final class Dewey_Indexer {
 		);
 
 		return array_slice( $scored, 0, Dewey_Settings::search_max_results() );
+	}
+
+	/**
+	 * Validate and optionally auto-heal index integrity.
+	 *
+	 * @param bool $auto_heal
+	 * @return array<string,mixed>
+	 */
+	public static function integrity_report( bool $auto_heal = true ): array {
+		$cached = get_transient( self::INTEGRITY_CACHE_KEY );
+		if ( is_array( $cached ) && ! empty( $cached['checked_at'] ?? '' ) ) {
+			return $cached;
+		}
+
+		$index = get_option( self::INDEX_OPTION_KEY, array() );
+		$items = is_array( $index ) && is_array( $index['items'] ?? null )
+			? $index['items']
+			: array();
+
+		$total_items     = count( $items );
+		$valid_items     = array();
+		$removed_count   = 0;
+		$orphan_post_ids = array();
+
+		foreach ( $items as $item ) {
+			if ( ! is_array( $item ) ) {
+				$removed_count++;
+				continue;
+			}
+
+			$post_id = (int) ( $item['post_id'] ?? 0 );
+			if ( $post_id <= 0 ) {
+				$removed_count++;
+				continue;
+			}
+
+			$post = get_post( $post_id );
+			if ( ! $post instanceof WP_Post ) {
+				$removed_count++;
+				$orphan_post_ids[] = $post_id;
+				continue;
+			}
+
+			$valid_items[] = $item;
+		}
+
+		$auto_healed = false;
+		if ( $auto_heal && $removed_count > 0 ) {
+			$index['items'] = array_values( $valid_items );
+			update_option( self::INDEX_OPTION_KEY, $index );
+			$auto_healed = true;
+		}
+
+		$report = array(
+			'healthy'         => 0 === $removed_count,
+			'total_items'     => $total_items,
+			'valid_items'     => count( $valid_items ),
+			'removed_count'   => $removed_count,
+			'auto_healed'     => $auto_healed,
+			'orphan_post_ids' => array_values( array_slice( array_unique( $orphan_post_ids ), 0, 10 ) ),
+			'checked_at'      => gmdate( 'c' ),
+		);
+		set_transient( self::INTEGRITY_CACHE_KEY, $report, 300 );
+
+		if ( $auto_healed ) {
+			self::update_status(
+				array(
+					'indexed_count' => count( $valid_items ),
+				)
+			);
+		}
+
+		return $report;
 	}
 
 	/**
@@ -265,5 +352,37 @@ final class Dewey_Indexer {
 		);
 
 		return array_values( array_unique( $parts ) );
+	}
+
+	/**
+	 * Read taxonomy terms as a normalized phrase string for indexing.
+	 *
+	 * @param int    $post_id
+	 * @param string $taxonomy
+	 * @return string
+	 */
+	private static function terms_to_text( int $post_id, string $taxonomy ): string {
+		if ( ! function_exists( 'get_the_terms' ) ) {
+			return '';
+		}
+
+		$terms = get_the_terms( $post_id, $taxonomy );
+		if ( is_wp_error( $terms ) || ! is_array( $terms ) || empty( $terms ) ) {
+			return '';
+		}
+
+		$names = array();
+		foreach ( $terms as $term ) {
+			if ( ! $term instanceof WP_Term ) {
+				continue;
+			}
+			$name = trim( (string) $term->name );
+			if ( '' === $name ) {
+				continue;
+			}
+			$names[] = strtolower( $name );
+		}
+
+		return implode( ' ', array_values( array_unique( $names ) ) );
 	}
 }

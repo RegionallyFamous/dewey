@@ -141,10 +141,15 @@ final class Dewey_REST_Controller {
 		}
 
 		$settings = Dewey_Settings::get_all();
+		$index    = Dewey_Indexer::status();
+		$health   = self::build_index_health( $index );
 		$response = array(
 			'ai_connected'     => dewey_ai_connection_status(),
 			'retrieval_mode'   => (string) ( $settings['retrieval_mode'] ?? 'core' ),
-			'index'            => Dewey_Indexer::status(),
+			'index'            => $index,
+			'index_health'     => $health,
+			'telemetry'        => Dewey_Engine::get_query_telemetry(),
+			'integrity'        => Dewey_Indexer::integrity_report( true ),
 			'guardrails'       => array(
 				'search_max_results'  => Dewey_Settings::search_max_results(),
 				'search_max_content'  => Dewey_Settings::search_max_content(),
@@ -481,5 +486,37 @@ final class Dewey_REST_Controller {
 		}
 
 		return $decoded;
+	}
+
+	/**
+	 * Build index staleness health details for status response.
+	 *
+	 * @param array<string,mixed> $index
+	 * @return array<string,mixed>
+	 */
+	private static function build_index_health( array $index ): array {
+		$stale_after_seconds = (int) apply_filters( 'dewey_index_stale_after_seconds', 604800 );
+		$stale_after_seconds = max( 300, $stale_after_seconds );
+		$last_completed      = (string) ( $index['last_completed'] ?? '' );
+		$generated_at        = (string) ( $index['generated_at'] ?? '' );
+		$source_timestamp    = '' !== $last_completed ? $last_completed : $generated_at;
+
+		$age_seconds = null;
+		if ( '' !== $source_timestamp ) {
+			$timestamp = strtotime( $source_timestamp );
+			if ( false !== $timestamp ) {
+				$age_seconds = max( 0, time() - $timestamp );
+			}
+		}
+
+		$is_stale = null !== $age_seconds && $age_seconds > $stale_after_seconds;
+		return array(
+			'is_stale'            => $is_stale,
+			'age_seconds'         => $age_seconds,
+			'stale_after_seconds' => $stale_after_seconds,
+			'warning'             => $is_stale
+				? __( 'Dewey index looks stale. Run a rebuild for fresher results.', 'dewey' )
+				: '',
+		);
 	}
 }

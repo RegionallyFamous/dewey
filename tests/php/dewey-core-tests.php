@@ -65,11 +65,27 @@ if ( ! class_exists( 'WP_Post' ) ) {
 		public $ID;
 		public $post_excerpt;
 		public $post_content;
+		public $post_type;
+		public $post_status;
 
-		public function __construct( $id = 0, $excerpt = '', $content = '' ) {
+		public function __construct( $id = 0, $excerpt = '', $content = '', $post_type = 'post', $post_status = 'publish' ) {
 			$this->ID           = (int) $id;
 			$this->post_excerpt = $excerpt;
 			$this->post_content = $content;
+			$this->post_type    = (string) $post_type;
+			$this->post_status  = (string) $post_status;
+		}
+	}
+}
+
+if ( ! class_exists( 'WP_Term' ) ) {
+	class WP_Term {
+		public $name;
+		public $count;
+
+		public function __construct( $name = '', $count = 0 ) {
+			$this->name  = (string) $name;
+			$this->count = (int) $count;
 		}
 	}
 }
@@ -124,6 +140,13 @@ if ( ! function_exists( 'get_transient' ) ) {
 if ( ! function_exists( 'set_transient' ) ) {
 	function set_transient( $key, $value ) {
 		$GLOBALS['dewey_test_transients'][ $key ] = $value;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'delete_transient' ) ) {
+	function delete_transient( $key ) {
+		unset( $GLOBALS['dewey_test_transients'][ $key ] );
 		return true;
 	}
 }
@@ -248,6 +271,24 @@ if ( ! function_exists( 'get_permalink' ) ) {
 if ( ! function_exists( 'get_post_modified_time' ) ) {
 	function get_post_modified_time() {
 		return gmdate( 'c' );
+	}
+}
+
+if ( ! function_exists( 'get_the_terms' ) ) {
+	function get_the_terms( $post_id, $taxonomy ) {
+		return $GLOBALS['dewey_test_terms'][ $post_id ][ $taxonomy ] ?? array();
+	}
+}
+
+if ( ! function_exists( 'dewey_ai_connection_status' ) ) {
+	function dewey_ai_connection_status() {
+		return true;
+	}
+}
+
+if ( ! function_exists( 'dewey_ai_connection_debug' ) ) {
+	function dewey_ai_connection_debug() {
+		return array( 'ok' => true );
 	}
 }
 
@@ -404,6 +445,60 @@ assert_true(
 	is_array( $engine_refine ) &&
 		str_contains( (string) ( $engine_refine['answer'] ?? '' ), 'concrete anchor' ) &&
 		3 === count( $engine_refine['follow_ups'] ?? array() )
+);
+
+$rest_query_refine = Dewey_REST_Controller::query(
+	new WP_REST_Request(
+		array(
+			'question' => 'Do we have any posts about onboarding?',
+		),
+		array()
+	)
+);
+assert_true(
+	'REST query returns deterministic no-hit refinement payload',
+	is_array( $rest_query_refine ) &&
+		0 === count( $rest_query_refine['citations'] ?? array() ) &&
+		3 === count( $rest_query_refine['follow_ups'] ?? array() )
+);
+
+$GLOBALS['dewey_test_options'][ Dewey_Indexer::INDEX_OPTION_KEY ] = array(
+	'generated_at'   => gmdate( 'c', time() - 120 ),
+	'avg_doc_length' => 80,
+	'items'          => array(
+		array(
+			'post_id'    => 77,
+			'title'      => 'Welcome Onboarding',
+			'permalink'  => 'https://example.com/?p=77',
+			'snippet'    => 'General content',
+			'tags_text'  => 'customer onboarding retention',
+			'cats_text'  => 'growth',
+			'word_count' => 80,
+			'modified'   => gmdate( 'c' ),
+		),
+	),
+);
+$index_term_results = Dewey_Indexer::search_index( 'retention' );
+assert_true(
+	'Indexed search can match taxonomy phrase fields',
+	is_array( $index_term_results ) &&
+		77 === (int) ( $index_term_results[0]['post_id'] ?? 0 )
+);
+
+$GLOBALS['dewey_test_options'][ Dewey_Indexer::INDEX_OPTION_KEY ]['generated_at'] = gmdate( 'c', time() - 900 );
+$GLOBALS['dewey_test_filters']['dewey_index_stale_after_seconds'] = 300;
+$status_response = Dewey_REST_Controller::status(
+	new WP_REST_Request(
+		array( 'debug' => false ),
+		array()
+	)
+);
+assert_true(
+	'Status exposes index staleness health and telemetry',
+	is_array( $status_response ) &&
+		true === ( $status_response['index_health']['is_stale'] ?? false ) &&
+		is_array( $status_response['telemetry'] ?? null ) &&
+		is_array( $status_response['integrity'] ?? null )
 );
 
 echo "PHP core tests passed.\n";
