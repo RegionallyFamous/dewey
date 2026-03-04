@@ -1,74 +1,78 @@
-# Dewey for WordPress
+# Dewey
 
-**Turn old posts into present-moment leverage.**
+**The AI assistant built into WordPress admin.**
 
-Dewey is your editorial memory inside wp-admin.  
-Instead of rewriting what your team already figured out, Dewey helps you surface prior insight fast, stay consistent, and ship with confidence.
+You open wp-admin dozens of times a day. Dewey lives there — a small panel in the corner, ready to search your content, take you anywhere, and get things done. Just ask.
 
 Built by [Regionally Famous](https://regionallyfamous.com).
 
-## Why Teams Use Dewey
+---
 
-- **Recover buried thinking quickly** before it gets rewritten from scratch.
-- **Keep voice and positioning tight** by grounding decisions in your own archive.
-- **Reduce editorial thrash** when deadlines are close and context is scattered.
-- **Move from “I know we wrote this” to “here it is”** in one place.
+## Find anything in your archive
 
-## What You Get Today
+Your old content is worth more than you're getting out of it. Most teams bury ideas, rewrite things they've already figured out, and drift from their own voice because there's no easy way back in.
 
-- A polished floating Dewey assistant in wp-admin with animated character and persistent chat.
-- Conversational AI answers grounded in your archive — with inline citations and source snippet previews.
-- Follow-up question chips after every response so the conversation stays natural.
-- **Navigation command suggestions**: as you type, Dewey surfaces instant go-to chips for any wp-admin screen — posts, media, themes, settings, users, and more. Works even without an AI provider connected.
-- **Action workflows inside chat**: create drafts, list recent content, and run confirm-gated publish/trash flows based on your actual WordPress capabilities.
-- Page-aware context: Dewey detects which wp-admin screen you're on and offers relevant suggestions.
-- Post-aware context: when editing a specific post, Dewey knows the title, status, tags, and categories.
-- Smart return greeting: reopening Dewey within 4 hours references your last topic.
-- Site stats grounding: published post count, last published date, and top categories injected into every response.
-- Copy-to-clipboard, retry on error, and Alt+Shift+D keyboard shortcut.
-- Relative message timestamps that update live.
-- BM25-style indexed retrieval with AI-powered query expansion and automatic re-indexing on content changes.
-- Retrieval resilience features: title-focused fallback matching, date-aware ranking bias, and deterministic no-hit refinement prompts.
-- Bundled WordPress knowledge pack: curated technical references are injected into prompts when your question matches known core topics.
-- Index quality monitoring: status telemetry counters, staleness signals, and automatic orphan-entry integrity cleanup.
-- Tone, verbosity, and citation style settings wired into the AI prompt.
-- Dewey-voiced settings confirmations and error messages.
-- Server-side retrieval + generation pipeline built on WordPress 7.0 AI infrastructure.
-- Hardened plugin foundation with capability, nonce, and per-route rate-limit guardrails.
+Dewey fixes that. Ask it anything in plain English:
 
-## Requirements
+> *"What have we written about email marketing?"*
+> *"Have we covered this topic before?"*
+> *"What did we publish about onboarding last year?"*
 
-- WordPress `7.0+`
-- PHP `8.1+`
+Dewey searches your archive and comes back with the actual posts — excerpts, links, and context — not just a list of titles. Every answer includes inline citations so you know exactly where the information came from.
 
-## Get Started
+---
 
-1. Install dependencies and build assets.
-2. Drop `dewey/` into `wp-content/plugins/`.
-3. Activate in WordPress admin.
-4. Click Dewey and start asking.
+## Navigate wp-admin without the menus
 
-## Localization
+Start typing in Dewey and go-to chips appear instantly for any screen in the admin — posts, pages, users, media, plugins, themes, settings, and more. Click one and you're there.
 
-Generate or refresh the translation template (`.pot`):
+No AI provider needed. No page load. Just type and go.
 
-```bash
-npm run i18n:pot
-```
+---
 
-This writes `languages/dewey.pot` for translators and GlotPress/import workflows.
+## Get things done by asking
 
-## Wiki (Technical Docs)
+Dewey doesn't just answer questions. It acts.
 
-The long-form technical details now live in the wiki docs:
+> *"Create a new draft about summer recipes"* — a draft appears, Dewey hands you the editor link.
 
-- [Wiki Home](docs/wiki/Home.md)
-- [Getting Started](docs/wiki/Getting-Started.md)
-- [Architecture and Scope](docs/wiki/Architecture-and-Scope.md)
-- [Developer Guide](docs/wiki/Developer-Guide.md)
-- [Release Checklist](docs/wiki/Release-Checklist.md)
-- [Security Model](docs/THREAT_MODEL.md)
+> *"Show me my recent drafts"* — Dewey lists them with direct edit links.
 
-## License
+> *"Publish my onboarding post"* — Dewey finds it, confirms what it found, and asks before anything goes live.
 
-GPL-2.0-or-later
+> *"Trash the welcome page"* — same flow. Dewey always asks before something destructive happens.
+
+Everything Dewey can do is limited to what your WordPress role allows. It can't do anything you can't do yourself.
+
+---
+
+## Always knows where you are
+
+When you open Dewey on the posts list, it knows you're on the posts list. When you're editing a draft, it knows the title, status, tags, and categories of the post you're working on. Ask a question and it has real context to work with — not just a blank slate.
+
+---
+
+## Remembers the conversation
+
+Close the panel, navigate to a different screen, come back — your thread is still there. Reopen Dewey within a few hours and it picks up where you left off.
+
+---
+
+## The details that matter
+
+- **Alt+Shift+D** opens and closes the panel from anywhere in wp-admin
+- Every answer has a copy button
+- If something goes wrong, a retry button appears with a plain explanation of what happened
+- Adjust Dewey's tone, verbosity, and citation style just by asking
+
+---
+
+## Get started
+
+Requires WordPress 7.0+ and PHP 8.1+. An AI provider connected in Settings → Connectors unlocks questions and answers. Navigation and content actions work immediately without one.
+
+→ [Installation and setup](docs/wiki/Getting-Started.md)
+
+---
+
+*[Technical docs, architecture, and developer reference →](docs/wiki/Home.md)*
