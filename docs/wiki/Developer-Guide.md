@@ -27,3 +27,4 @@ This regenerates `languages/dewey.pot` from PHP and JS i18n strings.
 - UI is built with `@wordpress/element` and `@wordpress/components`
 - Dewey behavior lives primarily in `src/components/dewey/`
 - chat logic and guardrails are centralized in `useDeweyChat`
+- Dewey voice/persona is centralized in `src/components/dewey/copy.js` and passed to `/query` as `assistant_system_prompt`

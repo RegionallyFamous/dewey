@@ -16,13 +16,15 @@
 	--dewey-accent: var(--wp-admin-theme-color, #2271b1);
 	--dewey-accent-dark: var(--wp-admin-theme-color-darker-10, #135e96);
 	--dewey-accent-soft: color-mix(in srgb, var(--dewey-accent) 18%, transparent);
-	--dewey-base-900: color-mix(in srgb, var(--dewey-accent) 38%, #000);
-	--dewey-base-700: color-mix(in srgb, var(--dewey-accent) 70%, #000);
-	--dewey-base-600: color-mix(in srgb, var(--dewey-accent) 82%, #fff);
-	--dewey-paper-100: color-mix(in srgb, var(--dewey-accent) 8%, #fff);
-	--dewey-paper-200: color-mix(in srgb, var(--dewey-accent) 14%, #fff);
-	--dewey-paper-line: color-mix(in srgb, var(--dewey-accent) 24%, #8a7d63);
-	--dewey-ribbon: color-mix(in srgb, var(--dewey-accent) 30%, #8b1e2e);
+
+	/* Dewey mobile mark palette (multi-color, not accent-monochrome). */
+	--dewey-base-900: #1b4332;
+	--dewey-base-700: #2d6a4f;
+	--dewey-base-600: #3d8a6a;
+	--dewey-paper-100: #fdf6e3;
+	--dewey-paper-200: #f5edd6;
+	--dewey-paper-line: #c4b898;
+	--dewey-ribbon: #8b1e2e;
 	--dewey-safe-right: max(12px, env(safe-area-inset-right, 0px));
 	--dewey-safe-left: max(12px, env(safe-area-inset-left, 0px));
 	--dewey-safe-bottom: max(12px, env(safe-area-inset-bottom, 0px));
@@ -356,6 +358,56 @@
 	transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.dewey-markdown > :first-child {
+	margin-top: 0;
+}
+
+.dewey-markdown > :last-child {
+	margin-bottom: 0;
+}
+
+.dewey-markdown p,
+.dewey-markdown ul,
+.dewey-markdown ol,
+.dewey-markdown pre,
+.dewey-markdown blockquote,
+.dewey-markdown h3,
+.dewey-markdown h4,
+.dewey-markdown h5 {
+	margin: 0 0 8px;
+}
+
+.dewey-markdown ul,
+.dewey-markdown ol {
+	padding-left: 18px;
+}
+
+.dewey-markdown code {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+	background: rgba(0, 0, 0, 0.06);
+	padding: 1px 4px;
+	border-radius: 4px;
+	font-size: 0.92em;
+}
+
+.dewey-markdown pre {
+	background: rgba(0, 0, 0, 0.08);
+	border-radius: 6px;
+	padding: 8px;
+	overflow-x: auto;
+}
+
+.dewey-markdown pre code {
+	background: transparent;
+	padding: 0;
+}
+
+.dewey-markdown blockquote {
+	border-left: 3px solid rgba(0, 0, 0, 0.16);
+	padding-left: 8px;
+	opacity: 0.92;
+}
+
 .dewey-message--user .dewey-message__bubble {
 	background: var(--dewey-accent);
 	color: #fff;
@@ -485,6 +537,29 @@
 		transform: translateY(-5px);
 		opacity: 1;
 	}
+}
+
+/* ─── Thinking bubble (message-list inline variant) ─────────────────────────── */
+
+.dewey-thinking-dots {
+	display: flex;
+	gap: 5px;
+}
+
+.dewey-thinking-dots span {
+	width: 6px;
+	height: 6px;
+	background: var(--dewey-accent);
+	border-radius: 50%;
+	animation: dewey-dot-bounce 1.2s ease-in-out infinite;
+}
+
+.dewey-thinking-dots span:nth-child(2) {
+	animation-delay: 0.2s;
+}
+
+.dewey-thinking-dots span:nth-child(3) {
+	animation-delay: 0.4s;
 }
 
 /* ─── Source pills ───────────────────────────────────────────────────────────── */
@@ -709,7 +784,8 @@
 		scroll-behavior: auto;
 	}
 
-	.dewey-panel__loading-dots span {
+	.dewey-panel__loading-dots span,
+	.dewey-thinking-dots span {
 		animation: none;
 	}
 }

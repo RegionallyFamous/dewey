@@ -10,63 +10,75 @@ import { __ } from '@wordpress/i18n';
 
 const STATE_CONFIG = {
 	idle: {
-		speech: __( 'Ask me anything about your archive! 📚', 'dewey' ),
+		speech: __( 'Your archive remembers. I simply retrieve.', 'dewey' ),
 		mouth: 'happy',
 		brows: 'normal',
 		particles: [ '📖' ],
 		loop: false,
 	},
 	searching: {
-		speech: __( "Ooh let me check - I've read everything! 🔍", 'dewey' ),
+		speech: __( "Let's see where this was filed.", 'dewey' ),
 		mouth: 'happy',
 		brows: 'normal',
 		particles: [ '🔍', '📄', '📝' ],
 		loop: false,
 	},
 	thinking: {
-		speech: __( 'Hmm… flipping through my memory… 🤔', 'dewey' ),
+		speech: __(
+			'Cross-referencing posts, tags, and your late-night decisions.',
+			'dewey'
+		),
 		mouth: 'happy',
 		brows: 'thinking',
 		particles: [ '💭', '📖' ],
 		loop: false,
 	},
 	found: {
-		speech: __( 'Found it! Here are your posts! ✨', 'dewey' ),
+		speech: __( 'There we are. Properly shelved and ready.', 'dewey' ),
 		mouth: 'happy',
 		brows: 'normal',
 		particles: [ '✨', '⭐', '💡', '🎉' ],
 		loop: true,
 	},
 	dancing: {
-		speech: __( 'Your archive is INCREDIBLE!! 🕺', 'dewey' ),
+		speech: __(
+			'A pristine metadata moment. You love to see it.',
+			'dewey'
+		),
 		mouth: 'happy',
 		brows: 'normal',
 		particles: [ '🎉', '🎊', '⭐', '✨', '🎈' ],
 		loop: true,
 	},
 	sad: {
-		speech: __( "Oh no… I couldn't find anything… 😢", 'dewey' ),
+		speech: __( "Interesting. It's not gone, it's hiding.", 'dewey' ),
 		mouth: 'sad',
 		brows: 'sad',
 		particles: [ '💧' ],
 		loop: false,
 	},
 	shocked: {
-		speech: __( 'Wait - you wrote THAT in 2019?! 😱', 'dewey' ),
+		speech: __( 'Well. That was an unexpected editorial choice.', 'dewey' ),
 		mouth: 'shocked',
 		brows: 'shocked',
 		particles: [ '😱', '❗' ],
 		loop: false,
 	},
 	hello: {
-		speech: __( "Hi!! I'm Dewey! I've read ALL your posts! 👋", 'dewey' ),
+		speech: __(
+			"I'm Dewey. I've been here since the first seed.",
+			'dewey'
+		),
 		mouth: 'happy',
 		brows: 'normal',
 		particles: [ '👋', '🌟', '📚', '✨' ],
 		loop: true,
 	},
 	tired: {
-		speech: __( 'That was… a lot of posts… zZz 😴', 'dewey' ),
+		speech: __(
+			'Large archive pass complete. Even librarians need tea.',
+			'dewey'
+		),
 		mouth: 'happy',
 		brows: 'sad',
 		particles: [ '💤', '😴' ],

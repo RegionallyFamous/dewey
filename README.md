@@ -16,12 +16,20 @@ Built by [Regionally Famous](https://regionallyfamous.com).
 
 ## What You Get Today
 
-- A polished floating Dewey assistant in wp-admin.
-- Live archive query and answer flow via Dewey REST endpoints.
+- A polished floating Dewey assistant in wp-admin with animated character and persistent chat.
+- Conversational AI answers grounded in your archive — with inline citations and source snippet previews.
+- Follow-up question chips after every response so the conversation stays natural.
+- Page-aware context: Dewey detects which wp-admin screen you're on and offers relevant suggestions.
+- Post-aware context: when editing a specific post, Dewey knows the title, status, tags, and categories.
+- Smart return greeting: reopening Dewey within 4 hours references your last topic.
+- Site stats grounding: published post count, last published date, and top categories injected into every response.
+- Copy-to-clipboard, retry on error, and Alt+Shift+D keyboard shortcut.
+- Relative message timestamps that update live.
+- BM25-style indexed retrieval with AI-powered query expansion and automatic re-indexing on content changes.
+- Tone, verbosity, and citation style settings wired into the AI prompt.
+- Dewey-voiced settings confirmations and error messages.
 - Server-side retrieval + generation pipeline built on WordPress 7.0 AI infrastructure.
-- Conversational starter flows with Dewey voice and stateful character animation.
-- Clear AI-connection guidance when a provider is not configured.
-- Hardened plugin foundation with capability, nonce, and rate-limit guardrails.
+- Hardened plugin foundation with capability, nonce, and per-route rate-limit guardrails.
 
 ## Requirements
 

@@ -3,7 +3,7 @@
  * Plugin Name: Dewey AI Search Assistant
  * Plugin URI: https://github.com/regionally-famous/dewey
  * Description: Dewey brings live archive query and AI answers into wp-admin, with citations and built-in guardrails powered by WordPress 7.0 core capabilities.
- * Version: 1.0.15
+ * Version: 1.0.17
  * Requires at least: 7.0
  * Requires PHP: 8.1
  * Author: Regionally Famous
@@ -18,7 +18,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'DEWEY_VERSION', '1.0.15' );
+define( 'DEWEY_VERSION', '1.0.17' );
 define( 'DEWEY_PLUGIN_FILE', __FILE__ );
 define( 'DEWEY_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DEWEY_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -182,6 +182,7 @@ function dewey_enqueue_admin_assets( string $hook_suffix ) {
 	// wp_add_inline_script + wp_json_encode preserves PHP types (bool, int, etc.)
 	// wp_localize_script must be avoided here because it coerces all values to
 	// strings — PHP false becomes "" — which breaks truthiness checks in JS.
+	$current_user = wp_get_current_user();
 	wp_add_inline_script(
 		'dewey-admin',
 		'window.deweyConfig = ' . wp_json_encode(
@@ -191,6 +192,8 @@ function dewey_enqueue_admin_assets( string $hook_suffix ) {
 				'aiConnected'   => dewey_ai_connection_status(),
 				'connectorsUrl' => esc_url_raw( dewey_get_connectors_admin_url() ),
 				'debugEnabled'  => current_user_can( 'manage_options' ),
+				'citationStyle' => (string) ( Dewey_Settings::get_all()['citation_style'] ?? 'titles' ),
+				'currentUser'   => sanitize_text_field( (string) ( $current_user->display_name ?? '' ) ),
 			)
 		) . ';',
 		'before'
@@ -352,3 +355,90 @@ function dewey_load_textdomain() {
 	load_plugin_textdomain( 'dewey', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 }
 add_action( 'plugins_loaded', 'dewey_load_textdomain' );
+
+// ---------------------------------------------------------------------------
+// Auto-reindex on content changes
+// ---------------------------------------------------------------------------
+
+/**
+ * Schedule a background reindex after a post is saved or deleted, with a
+ * 60-second cooldown to prevent thrashing during bulk imports.
+ *
+ * @param int     $post_id
+ * @param WP_Post $post
+ * @return void
+ */
+function dewey_maybe_schedule_reindex( int $post_id, WP_Post $post ): void {
+	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+		return;
+	}
+
+	$settings   = Dewey_Settings::get_all();
+	$post_types = is_array( $settings['indexed_post_types'] ?? null )
+		? $settings['indexed_post_types']
+		: array( 'post', 'page' );
+	$statuses   = is_array( $settings['indexed_statuses'] ?? null )
+		? $settings['indexed_statuses']
+		: array( 'publish' );
+
+	if ( ! in_array( $post->post_type, $post_types, true ) ) {
+		return;
+	}
+
+	if ( ! in_array( $post->post_status, $statuses, true ) ) {
+		return;
+	}
+
+	// Cooldown: skip if a reindex completed or was scheduled within the last 60 seconds.
+	$status      = Dewey_Indexer::status();
+	$last_completed = (string) ( $status['last_completed'] ?? '' );
+	if ( '' !== $last_completed ) {
+		$elapsed = time() - (int) strtotime( $last_completed );
+		if ( $elapsed < 60 ) {
+			return;
+		}
+	}
+
+	if ( ! wp_next_scheduled( 'dewey_scheduled_reindex' ) ) {
+		wp_schedule_single_event( time() + 5, 'dewey_scheduled_reindex' );
+	}
+}
+add_action(
+	'save_post',
+	static function ( int $post_id ) {
+		$post = get_post( $post_id );
+		if ( $post instanceof WP_Post ) {
+			dewey_maybe_schedule_reindex( $post_id, $post );
+		}
+	}
+);
+
+/**
+ * Schedule a background reindex when a post is permanently deleted.
+ *
+ * @param int $post_id
+ * @return void
+ */
+add_action(
+	'delete_post',
+	static function ( int $post_id ) {
+		$post = get_post( $post_id );
+		if ( $post instanceof WP_Post ) {
+			dewey_maybe_schedule_reindex( $post_id, $post );
+		}
+	}
+);
+
+/**
+ * WP-Cron callback to run the Dewey index rebuild in the background.
+ *
+ * @return void
+ */
+function dewey_run_scheduled_reindex(): void {
+	if ( ! class_exists( 'Dewey_Indexer' ) ) {
+		return;
+	}
+
+	Dewey_Indexer::rebuild();
+}
+add_action( 'dewey_scheduled_reindex', 'dewey_run_scheduled_reindex' );

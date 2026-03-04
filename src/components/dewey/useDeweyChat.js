@@ -11,9 +11,13 @@ import {
 	useRef,
 	useState,
 } from '@wordpress/element';
+import { __ } from '@wordpress/i18n';
 import {
+	DEWEY_SOUL_SYSTEM_PROMPT,
 	FIRST_OPEN_MESSAGE,
+	INVESTIGATION_MESSAGE,
 	NO_AI_MESSAGE,
+	PAGE_CONTEXT_HINTS,
 	STARTER_ACTIONS,
 	STORAGE_KEYS,
 	getSpeechText,
@@ -22,7 +26,13 @@ import { useDewey } from './useDewey';
 
 const MAX_INPUT_CHARS = 500;
 const MAX_MESSAGES = 80;
+const MAX_HISTORY_TURNS = 10;
 const SUBMIT_THROTTLE_MS = 800;
+const CONNECTION_REFRESH_THROTTLE_MS = 2000;
+const STORAGE_VERSION = 1;
+const STORAGE_MAX_MESSAGES = 50;
+const STORAGE_MAX_BYTES = 150_000;
+const STORAGE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const CONTROL_CHARS_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 const REQUEST_TIMEOUT_MS = 30000;
 
@@ -84,14 +94,116 @@ function createMessage( role, text, extra = {} ) {
 			.slice( 2 ) }`,
 		role,
 		text,
+		timestamp: Date.now(),
 		...extra,
 	};
 }
 
+/**
+ * Extract the post ID from the current admin URL (e.g. ?post=123&action=edit).
+ * Returns 0 when not on a single-post editing screen.
+ */
+function getCurrentPostId() {
+	try {
+		const params = new URLSearchParams( window.location.search );
+		const post = parseInt( params.get( 'post' ) ?? '0', 10 );
+		const action = params.get( 'action' );
+		// Only send the post ID when actively editing — not on the posts list.
+		if ( post > 0 && ( action === 'edit' || action === null ) ) {
+			return post;
+		}
+	} catch ( e ) {
+		// Ignore — non-standard environments.
+	}
+	return 0;
+}
+
+/**
+ * If there is a stored conversation from within the last 4 hours, return a
+ * pick-up greeting that references the last question asked. Returns null when
+ * there is nothing recent to reference.
+ *
+ * @param {Array}  storedMessages The restored message array from localStorage.
+ * @param {number} savedAt        Unix ms timestamp from the storage envelope.
+ * @return {string|null} Greeting string, or null if no recent conversation exists.
+ */
+function buildReturnGreeting( storedMessages, savedAt ) {
+	const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+	if ( ! savedAt || Date.now() - savedAt > FOUR_HOURS_MS ) {
+		return null;
+	}
+
+	// Need at least one real exchange beyond the welcome message.
+	const conversational = storedMessages.filter(
+		( m ) => m.id !== 'welcome' && m.role === 'user'
+	);
+	if ( conversational.length === 0 ) {
+		return null;
+	}
+
+	const lastUserMsg = conversational[ conversational.length - 1 ];
+	const topic = String( lastUserMsg.text ?? '' )
+		.trim()
+		.slice( 0, 60 );
+	const ellipsis = ( lastUserMsg.text ?? '' ).length > 60 ? '…' : '';
+
+	const name =
+		typeof window.deweyConfig?.currentUser === 'string' &&
+		window.deweyConfig.currentUser.trim() !== ''
+			? window.deweyConfig.currentUser.trim()
+			: null;
+
+	if ( name ) {
+		return `${ name } — we were just talking about "${ topic }${ ellipsis }". Want to pick up where we left off, or ask something new?`;
+	}
+	return `Welcome back — we were talking about "${ topic }${ ellipsis }". Want to continue, or ask something new?`;
+}
+
+function getTimeOfDayGreeting( name ) {
+	const h = new Date().getHours();
+	let salutation;
+	if ( h < 12 ) {
+		salutation = 'Morning';
+	} else if ( h < 17 ) {
+		salutation = 'Afternoon';
+	} else if ( h < 21 ) {
+		salutation = 'Evening';
+	} else {
+		salutation = 'Working late';
+	}
+
+	if ( name ) {
+		const suffix =
+			h < 17 ? ' — what are you working on?' : ' — what do you need?';
+		return `${ salutation }, ${ name }${ suffix }`;
+	}
+
+	// No name — use the fallback copy string.
+	return null;
+}
+
 function createWelcomeMessage() {
-	return createMessage( 'assistant', FIRST_OPEN_MESSAGE, {
+	const name =
+		typeof window.deweyConfig?.currentUser === 'string' &&
+		window.deweyConfig.currentUser.trim() !== ''
+			? window.deweyConfig.currentUser.trim()
+			: null;
+
+	const greeting = getTimeOfDayGreeting( name ) ?? FIRST_OPEN_MESSAGE;
+
+	// If the current wp-admin screen is recognized, append a contextual hint and
+	// swap in page-specific action chips so the first suggestion is always relevant.
+	const pagenow = typeof window.pagenow === 'string' ? window.pagenow : '';
+	const pageHint = pagenow ? PAGE_CONTEXT_HINTS[ pagenow ] ?? null : null;
+
+	const welcomeText = pageHint
+		? `${ greeting } ${ pageHint.hint }`
+		: greeting;
+	const welcomeActions = pageHint ? pageHint.actions : STARTER_ACTIONS;
+
+	return createMessage( 'assistant', welcomeText, {
 		id: 'welcome',
-		actions: STARTER_ACTIONS,
+		actions: welcomeActions,
 	} );
 }
 
@@ -178,6 +290,133 @@ function normalizeUserInput( value ) {
 	return value.replace( CONTROL_CHARS_RE, '' ).slice( 0, MAX_INPUT_CHARS );
 }
 
+/**
+ * Load messages persisted from a previous session. Validates the schema
+ * version and drops any session older than STORAGE_TTL_MS. Confirm-action
+ * buttons are stripped because their tokens are one-time and expire.
+ *
+ * @return {Array} Restored message array, or a fresh welcome message array.
+ */
+function loadStoredMessages() {
+	try {
+		const raw = window.localStorage.getItem( STORAGE_KEYS.messages );
+		if ( ! raw ) {
+			return [ createWelcomeMessage() ];
+		}
+		const envelope = JSON.parse( raw );
+		if (
+			! envelope ||
+			envelope.v !== STORAGE_VERSION ||
+			! Array.isArray( envelope.messages ) ||
+			typeof envelope.savedAt !== 'number' ||
+			Date.now() - envelope.savedAt > STORAGE_TTL_MS
+		) {
+			return [ createWelcomeMessage() ];
+		}
+		const restored = envelope.messages.map( ( m ) => {
+			if ( ! m || typeof m !== 'object' ) {
+				return null;
+			}
+			const clean = { ...m };
+			if ( Array.isArray( clean.actions ) ) {
+				clean.actions = clean.actions.filter(
+					( a ) => a && a.kind !== 'confirm'
+				);
+				if ( clean.actions.length === 0 ) {
+					delete clean.actions;
+				}
+			}
+			return clean;
+		} );
+		const valid = restored.filter( Boolean );
+		if ( valid.length === 0 ) {
+			return [ createWelcomeMessage() ];
+		}
+
+		// If there is a recent conversation, swap the welcome message text for a
+		// pick-up greeting so Dewey acknowledges the context on return.
+		const returnGreeting = buildReturnGreeting( valid, envelope.savedAt );
+		if ( returnGreeting && valid[ 0 ] ) {
+			valid[ 0 ] = { ...valid[ 0 ], text: returnGreeting };
+		}
+		return valid;
+	} catch ( e ) {
+		return [ createWelcomeMessage() ];
+	}
+}
+
+/**
+ * Persist the message array to localStorage inside a versioned envelope.
+ * Caps at STORAGE_MAX_MESSAGES and STORAGE_MAX_BYTES; the welcome message is
+ * always kept as the first entry regardless of caps.
+ *
+ * @param {Array} msgs Message array to persist.
+ */
+function saveMessages( msgs ) {
+	try {
+		const welcome = msgs[ 0 ];
+		let toStore = msgs;
+		if ( toStore.length > STORAGE_MAX_MESSAGES ) {
+			toStore = [
+				welcome,
+				...toStore.slice( -( STORAGE_MAX_MESSAGES - 1 ) ),
+			];
+		}
+		const envelope = {
+			v: STORAGE_VERSION,
+			savedAt: Date.now(),
+			messages: toStore,
+		};
+		const serialized = JSON.stringify( envelope );
+		if ( serialized.length > STORAGE_MAX_BYTES ) {
+			// Drop older messages (but keep welcome) until it fits.
+			let trimmed = [ ...toStore ];
+			while (
+				trimmed.length > 2 &&
+				JSON.stringify( {
+					v: STORAGE_VERSION,
+					savedAt: Date.now(),
+					messages: trimmed,
+				} ).length > STORAGE_MAX_BYTES
+			) {
+				trimmed = [ welcome, ...trimmed.slice( 2 ) ];
+			}
+			window.localStorage.setItem(
+				STORAGE_KEYS.messages,
+				JSON.stringify( {
+					v: STORAGE_VERSION,
+					savedAt: Date.now(),
+					messages: trimmed,
+				} )
+			);
+			return;
+		}
+		window.localStorage.setItem( STORAGE_KEYS.messages, serialized );
+	} catch ( e ) {
+		// Quota exceeded or private mode — silently skip.
+	}
+}
+
+/**
+ * Build a conversation history array from the messages state, excluding the
+ * permanent welcome message and capping at MAX_HISTORY_TURNS most-recent turns.
+ *
+ * @param {Array} allMessages All current chat messages.
+ * @return {Array<{role: string, text: string}>} Sanitized history turns.
+ */
+function buildHistory( allMessages ) {
+	const conversational = allMessages.filter(
+		( m ) =>
+			m.id !== 'welcome' &&
+			( m.role === 'user' || m.role === 'assistant' )
+	);
+	const recent = conversational.slice( -MAX_HISTORY_TURNS );
+	return recent.map( ( m ) => ( {
+		role: m.role,
+		text: String( m.text || '' ).slice( 0, MAX_INPUT_CHARS ),
+	} ) );
+}
+
 function isValidStarterAction( action ) {
 	if ( ! action || typeof action !== 'object' ) {
 		return false;
@@ -190,9 +429,7 @@ export function useDeweyChat() {
 	const isFirstOpen = useMemo( () => getInitialOpenState(), [] );
 	const [ isOpen, setIsOpen ] = useState( isFirstOpen );
 	const [ inputValue, setInputValue ] = useState( '' );
-	const [ messages, setMessages ] = useState( () => [
-		createWelcomeMessage(),
-	] );
+	const [ messages, setMessages ] = useState( () => loadStoredMessages() );
 	const [ hasAskedStarter, setHasAskedStarter ] = useState( false );
 	const [ isSubmitting, setIsSubmitting ] = useState( false );
 	const [ isAiConnected, setIsAiConnected ] = useState( () =>
@@ -201,6 +438,9 @@ export function useDeweyChat() {
 	const [ connectionDebug, setConnectionDebug ] = useState( null );
 	const inputRef = useRef( null );
 	const lastSubmitAtRef = useRef( 0 );
+	const lastQuestionRef = useRef( '' );
+	const lastConnectionRefreshAtRef = useRef( 0 );
+	const connectionRefreshInFlightRef = useRef( false );
 	const { deweyState, deweyHandlers } = useDewey();
 	const { onFirstOpen } = deweyHandlers;
 
@@ -223,85 +463,108 @@ export function useDeweyChat() {
 		// we pick up a page reload which refreshes the PHP-injected value.
 		let isActive = true;
 		const refreshConnection = async () => {
-			let runtimeSupported = null;
-			let runtimeError = '';
-			let serverStatus = null;
-			let serverError = '';
-			const localized = detectAiConnection();
+			if ( connectionRefreshInFlightRef.current ) {
+				return;
+			}
+			const now = Date.now();
+			if (
+				now - lastConnectionRefreshAtRef.current <
+				CONNECTION_REFRESH_THROTTLE_MS
+			) {
+				return;
+			}
+			lastConnectionRefreshAtRef.current = now;
+			connectionRefreshInFlightRef.current = true;
 
-			const aiClient = window.wp?.aiClient;
-			if ( aiClient && typeof aiClient.prompt === 'function' ) {
-				try {
-					const prompt = aiClient.prompt( 'Connection check' );
-					if (
-						typeof prompt?.isSupportedForTextGeneration ===
-						'function'
-					) {
-						runtimeSupported = Boolean(
-							await prompt.isSupportedForTextGeneration()
-						);
+			try {
+				let runtimeSupported = null;
+				let runtimeError = '';
+				let serverStatus = null;
+				let serverError = '';
+				const localized = detectAiConnection();
+
+				const aiClient = window.wp?.aiClient;
+				if ( aiClient && typeof aiClient.prompt === 'function' ) {
+					try {
+						const prompt = aiClient.prompt( 'Connection check' );
+						if (
+							typeof prompt?.isSupportedForTextGeneration ===
+							'function'
+						) {
+							runtimeSupported = Boolean(
+								await prompt.isSupportedForTextGeneration()
+							);
+						}
+					} catch ( error ) {
+						runtimeError =
+							error instanceof Error
+								? error.message
+								: 'Client capability check failed.';
 					}
-				} catch ( error ) {
-					runtimeError =
-						error instanceof Error
-							? error.message
-							: 'Client capability check failed.';
 				}
-			}
 
-			if ( typeof window.fetch === 'function' ) {
-				try {
-					serverStatus = await getServerStatus();
-				} catch ( error ) {
-					serverError =
-						error instanceof Error
-							? error.message
-							: 'Status endpoint probe failed.';
+				if ( typeof window.fetch === 'function' ) {
+					try {
+						serverStatus = await getServerStatus();
+					} catch ( error ) {
+						serverError =
+							error instanceof Error
+								? error.message
+								: 'Status endpoint probe failed.';
+					}
 				}
-			}
 
-			const serverConnected =
-				typeof serverStatus?.ai_connected === 'boolean'
-					? serverStatus.ai_connected
-					: null;
-			const nextConnected = Boolean(
-				serverConnected ?? runtimeSupported ?? localized
-			);
-			const hasProbeData =
-				null !== runtimeSupported ||
-				null !== serverConnected ||
-				'' !== runtimeError ||
-				'' !== serverError;
-			const nextDebug = {
-				localized,
-				runtimeSupported,
-				runtimeError,
-				serverConnected,
-				serverError,
-				serverDebug:
-					serverStatus &&
-					typeof serverStatus === 'object' &&
-					serverStatus.ai_connection_debug
-						? serverStatus.ai_connection_debug
-						: null,
-			};
+				const serverConnected =
+					typeof serverStatus?.ai_connected === 'boolean'
+						? serverStatus.ai_connected
+						: null;
+				const nextConnected = Boolean(
+					serverConnected ?? runtimeSupported ?? localized
+				);
+				const hasProbeData =
+					null !== runtimeSupported ||
+					null !== serverConnected ||
+					'' !== runtimeError ||
+					'' !== serverError;
+				const nextDebug = {
+					localized,
+					runtimeSupported,
+					runtimeError,
+					serverConnected,
+					serverError,
+					serverDebug:
+						serverStatus &&
+						typeof serverStatus === 'object' &&
+						serverStatus.ai_connection_debug
+							? serverStatus.ai_connection_debug
+							: null,
+				};
 
-			if ( hasProbeData || isDebugEnabled() ) {
-				emitDebugLog( 'connection_probe', nextDebug );
-			}
-
-			if ( isActive ) {
-				if ( hasProbeData ) {
-					setIsAiConnected( nextConnected );
-				}
 				if ( hasProbeData || isDebugEnabled() ) {
-					setConnectionDebug( nextDebug );
+					emitDebugLog( 'connection_probe', nextDebug );
 				}
+
+				if ( isActive ) {
+					if ( hasProbeData ) {
+						setIsAiConnected( nextConnected );
+					}
+					if ( hasProbeData || isDebugEnabled() ) {
+						setConnectionDebug( nextDebug );
+					}
+				}
+			} finally {
+				connectionRefreshInFlightRef.current = false;
 			}
 		};
 
 		void refreshConnection();
 		const onRefresh = () => {
+			if (
+				typeof document !== 'undefined' &&
+				document.visibilityState === 'hidden'
+			) {
+				return;
+			}
 			void refreshConnection();
 		};
 		window.addEventListener( 'focus', onRefresh );
@@ -321,14 +584,14 @@ export function useDeweyChat() {
 
 	const addMessage = useCallback( ( role, text, extra = {} ) => {
 		setMessages( ( current ) => {
-			const next = [ ...current, createMessage( role, text, extra ) ];
-			if ( next.length <= MAX_MESSAGES ) {
-				return next;
+			let next = [ ...current, createMessage( role, text, extra ) ];
+			if ( next.length > MAX_MESSAGES ) {
+				const [ welcomeMessage ] = next;
+				const tail = next.slice( next.length - ( MAX_MESSAGES - 1 ) );
+				next = [ welcomeMessage, ...tail ];
 			}
-
-			const [ welcomeMessage ] = next;
-			const tail = next.slice( next.length - ( MAX_MESSAGES - 1 ) );
-			return [ welcomeMessage, ...tail ];
+			saveMessages( next );
+			return next;
 		} );
 	}, [] );
 
@@ -351,6 +614,45 @@ export function useDeweyChat() {
 		} );
 	}, [] );
 
+	// Alt+Shift+D keyboard shortcut to toggle the panel from anywhere in wp-admin.
+	useEffect( () => {
+		const onKeyDown = ( event ) => {
+			if ( ! event.altKey || ! event.shiftKey || event.key !== 'D' ) {
+				return;
+			}
+			const activeElement =
+				inputRef.current?.ownerDocument?.activeElement ?? null;
+			const tag = activeElement?.tagName;
+			if (
+				tag === 'INPUT' ||
+				tag === 'TEXTAREA' ||
+				activeElement?.isContentEditable
+			) {
+				return;
+			}
+			event.preventDefault();
+			setIsOpen( ( current ) => {
+				const next = ! current;
+				if ( next ) {
+					setTimeout( () => inputRef.current?.focus(), 0 );
+				}
+				return next;
+			} );
+		};
+		window.addEventListener( 'keydown', onKeyDown );
+		return () => window.removeEventListener( 'keydown', onKeyDown );
+	}, [] );
+
+	const clearConversation = useCallback( () => {
+		try {
+			window.localStorage.removeItem( STORAGE_KEYS.messages );
+		} catch ( e ) {}
+		const fresh = createWelcomeMessage();
+		setMessages( [ fresh ] );
+		setHasAskedStarter( false );
+		setTimeout( () => inputRef.current?.focus(), 0 );
+	}, [] );
+
 	const handleStarter = useCallback(
 		( action ) => {
 			if ( ! isValidStarterAction( action ) ) {
@@ -364,9 +666,12 @@ export function useDeweyChat() {
 		[ addMessage, deweyHandlers ]
 	);
 
-	const handleSubmit = useCallback(
-		async ( event ) => {
-			event.preventDefault();
+	/**
+	 * Core question submission logic shared by the form, follow-up chips, and retry.
+	 * Throttle and duplicate-guard are applied here.
+	 */
+	const submitQuestion = useCallback(
+		async ( question ) => {
 			if ( isSubmitting ) {
 				return;
 			}
@@ -374,16 +679,12 @@ export function useDeweyChat() {
 			if ( now - lastSubmitAtRef.current < SUBMIT_THROTTLE_MS ) {
 				return;
 			}
-
-			const question = normalizeUserInput( inputValue ).trim();
-			if ( ! question ) {
-				return;
-			}
 			lastSubmitAtRef.current = now;
+			lastQuestionRef.current = question;
 
-			setInputValue( '' );
 			addMessage( 'user', question );
 			deweyHandlers.onQueryStart();
+
 			if ( ! isAiConnected && ! getApiConfig() ) {
 				deweyHandlers.onNoResults();
 				addMessage( 'assistant', NO_AI_MESSAGE );
@@ -392,8 +693,23 @@ export function useDeweyChat() {
 
 			setIsSubmitting( true );
 			try {
-				const response = await callDeweyApi( '/query', { question } );
+				// Pass Dewey's canonical persona prompt so downstream LLM calls
+				// keep the voice consistent regardless of provider.
+				// Include the recent conversation history so Dewey can handle
+				// follow-up questions like "tell me more about that".
+				const history = buildHistory( messages );
+				const response = await callDeweyApi( '/query', {
+					question,
+					history,
+					assistant_system_prompt: DEWEY_SOUL_SYSTEM_PROMPT,
+					page_context:
+						typeof window.pagenow === 'string'
+							? window.pagenow
+							: '',
+					post_id: getCurrentPostId(),
+				} );
 				setIsAiConnected( true );
+
 				if ( response?.requires_confirm && response?.token ) {
 					deweyHandlers.onPostsFound( 1 );
 					deweyHandlers.onAnswerReady( 1 );
@@ -407,7 +723,7 @@ export function useDeweyChat() {
 							actions: [
 								{
 									id: `confirm-${ response.token }`,
-									label: 'Confirm',
+									label: __( 'Confirm', 'dewey' ),
 									kind: 'confirm',
 									token: response.token,
 								},
@@ -424,13 +740,32 @@ export function useDeweyChat() {
 					deweyHandlers.onNoResults();
 				}
 				deweyHandlers.onAnswerReady( Math.max( 1, citations.length ) );
+
+				// Build follow-up chips from the backend's suggested questions.
+				const rawFollowUps = Array.isArray( response?.follow_ups )
+					? response.follow_ups
+					: [];
+				const followUpActions = rawFollowUps
+					.filter(
+						( q ) => typeof q === 'string' && q.trim().length > 0
+					)
+					.slice( 0, 3 )
+					.map( ( q, i ) => ( {
+						id: `followup-${ i }-${ Date.now() }`,
+						kind: 'followup',
+						label: q.trim(),
+						question: q.trim(),
+					} ) );
+
 				addMessage(
 					'assistant',
-					String(
-						response?.answer || 'I could not generate an answer.'
-					),
+					String( response?.answer || INVESTIGATION_MESSAGE ),
 					{
 						citations,
+						actions:
+							followUpActions.length > 0
+								? followUpActions
+								: undefined,
 					}
 				);
 			} catch ( error ) {
@@ -453,24 +788,68 @@ export function useDeweyChat() {
 					return;
 				}
 				deweyHandlers.onError();
-				addMessage(
-					'assistant',
-					error instanceof Error
-						? error.message
-						: 'Dewey hit an unexpected error.'
-				);
+				const rawMessage = error instanceof Error ? error.message : '';
+				// Use Dewey's voice for generic failures; keep specific API messages
+				// (e.g. rate limit, 503) since they carry actionable information.
+				const isGenericError =
+					! rawMessage ||
+					/unexpected error|failed unexpectedly/i.test( rawMessage );
+				const errorText = isGenericError
+					? __(
+							'Something got tangled up on my end. Hit the retry button — that usually sorts it.',
+							'dewey'
+					  )
+					: rawMessage;
+				addMessage( 'assistant', errorText, {
+					actions: [
+						{
+							id: `retry-${ Date.now() }`,
+							kind: 'retry',
+							label: __( 'Try again', 'dewey' ),
+							question: lastQuestionRef.current,
+						},
+					],
+				} );
 			} finally {
 				setIsSubmitting( false );
 			}
 		},
-		[ addMessage, deweyHandlers, inputValue, isAiConnected, isSubmitting ]
+		[ addMessage, deweyHandlers, isAiConnected, isSubmitting, messages ]
+	);
+
+	const handleSubmit = useCallback(
+		async ( event ) => {
+			event.preventDefault();
+			const question = normalizeUserInput( inputValue ).trim();
+			if ( ! question ) {
+				return;
+			}
+			setInputValue( '' );
+			await submitQuestion( question );
+		},
+		[ inputValue, submitQuestion ]
 	);
 
 	const handleMessageAction = useCallback(
 		async ( action ) => {
-			if ( ! action || action.kind !== 'confirm' || ! action.token ) {
+			if ( ! action ) {
 				return;
 			}
+
+			if ( action.kind === 'followup' && action.question ) {
+				await submitQuestion( String( action.question ) );
+				return;
+			}
+
+			if ( action.kind === 'retry' && action.question ) {
+				await submitQuestion( String( action.question ) );
+				return;
+			}
+
+			if ( action.kind !== 'confirm' || ! action.token ) {
+				return;
+			}
+
 			try {
 				const response = await callDeweyApi( '/confirm-action', {
 					token: action.token,
@@ -478,19 +857,22 @@ export function useDeweyChat() {
 				} );
 				addMessage(
 					'assistant',
-					String( response?.message || 'Confirmed.' )
+					String( response?.message || __( 'Confirmed.', 'dewey' ) )
 				);
 			} catch ( error ) {
 				addMessage(
 					'assistant',
 					error instanceof Error
 						? error.message
-						: 'Failed to confirm action.'
+						: __( 'Failed to confirm action.', 'dewey' )
 				);
 			}
 		},
-		[ addMessage ]
+		[ addMessage, submitQuestion ]
 	);
+
+	const citationStyle =
+		window.deweyConfig?.citationStyle === 'links' ? 'links' : 'titles';
 
 	return {
 		isOpen,
@@ -500,6 +882,7 @@ export function useDeweyChat() {
 		isSubmitting,
 		isAiConnected,
 		connectionDebug,
+		citationStyle,
 		deweyState,
 		speech,
 		inputRef,
@@ -508,6 +891,7 @@ export function useDeweyChat() {
 		openPanel,
 		closePanel,
 		togglePanel,
+		clearConversation,
 		handleStarter,
 		handleMessageAction,
 		handleSubmit,

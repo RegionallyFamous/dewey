@@ -1,7 +1,12 @@
 // @jest-environment jsdom
 
 import { act, renderHook } from '@testing-library/react';
-import { NO_AI_MESSAGE, STARTER_ACTIONS, STORAGE_KEYS } from './copy';
+import {
+	DEWEY_SOUL_SYSTEM_PROMPT,
+	NO_AI_MESSAGE,
+	STARTER_ACTIONS,
+	STORAGE_KEYS,
+} from './copy';
 import { detectAiConnection, useDeweyChat } from './useDeweyChat';
 import { useDewey } from './useDewey';
 
@@ -209,6 +214,20 @@ describe( 'useDeweyChat', () => {
 					'X-WP-Nonce': 'valid-nonce',
 				} ),
 			} )
+		);
+		const queryRequest = window.fetch.mock.calls.find(
+			( call ) =>
+				typeof call[ 0 ] === 'string' &&
+				call[ 0 ].endsWith( '/query' ) &&
+				typeof call[ 1 ]?.body === 'string'
+		);
+		expect( queryRequest ).toBeDefined();
+		const requestPayload = JSON.parse( queryRequest[ 1 ].body );
+		expect( requestPayload.question ).toBe(
+			'What did we publish on onboarding?'
+		);
+		expect( requestPayload.assistant_system_prompt ).toBe(
+			DEWEY_SOUL_SYSTEM_PROMPT
 		);
 		const lastMessage =
 			result.current.messages[ result.current.messages.length - 1 ];

@@ -8,3 +8,4 @@ export { useDeweyChat } from './useDeweyChat';
 export { default as DeweyFab } from './ui/DeweyFab';
 export { default as DeweyPanel } from './ui/DeweyPanel';
 export { default as MessageList } from './ui/MessageList';
+export { default as MarkdownText } from './ui/MarkdownText';

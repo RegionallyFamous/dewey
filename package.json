@@ -1,6 +1,6 @@
 {
   "name": "dewey",
-  "version": "1.0.15",
+  "version": "1.0.17",
   "private": true,
   "description": "Dewey WordPress plugin admin UI and release tooling.",
   "scripts": {

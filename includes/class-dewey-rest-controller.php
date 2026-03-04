@@ -25,13 +25,37 @@ final class Dewey_REST_Controller {
 				'methods'             => WP_REST_Server::CREATABLE,
 				'permission_callback' => array( __CLASS__, 'can_query' ),
 				'callback'            => array( __CLASS__, 'query' ),
-				'args'                => array(
-					'question' => array(
-						'type'              => 'string',
-						'required'          => true,
-						'sanitize_callback' => array( __CLASS__, 'sanitize_question' ),
-					),
+			'args'                => array(
+				'question' => array(
+					'type'              => 'string',
+					'required'          => true,
+					'sanitize_callback' => array( __CLASS__, 'sanitize_question' ),
 				),
+				'assistant_system_prompt' => array(
+					'type'              => 'string',
+					'required'          => false,
+					'default'           => '',
+					'sanitize_callback' => array( __CLASS__, 'sanitize_assistant_prompt' ),
+				),
+				'history' => array(
+					'type'              => 'array',
+					'required'          => false,
+					'default'           => array(),
+					'sanitize_callback' => array( __CLASS__, 'sanitize_history' ),
+				),
+				'page_context' => array(
+					'type'              => 'string',
+					'required'          => false,
+					'default'           => '',
+					'sanitize_callback' => array( __CLASS__, 'sanitize_page_context' ),
+				),
+				'post_id' => array(
+					'type'              => 'integer',
+					'required'          => false,
+					'default'           => 0,
+					'sanitize_callback' => 'absint',
+				),
+			),
 			)
 		);
 
@@ -93,8 +117,13 @@ final class Dewey_REST_Controller {
 			return $rate;
 		}
 
-		$question = (string) $request->get_param( 'question' );
-		$result   = Dewey_Engine::answer_question( $question );
+		$question         = (string) $request->get_param( 'question' );
+		$assistant_prompt = (string) $request->get_param( 'assistant_system_prompt' );
+		$history          = $request->get_param( 'history' );
+		$history          = is_array( $history ) ? $history : array();
+		$page_context     = (string) $request->get_param( 'page_context' );
+		$post_id          = (int) $request->get_param( 'post_id' );
+		$result           = Dewey_Engine::answer_question( $question, $assistant_prompt, $history, $page_context, $post_id );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
@@ -199,8 +228,8 @@ final class Dewey_REST_Controller {
 			$updated = Dewey_Settings::update( $params );
 			return rest_ensure_response(
 				array(
-					'ok'       => true,
-					'message'  => __( 'Confirmed: settings updated.', 'dewey' ),
+					'ok'      => true,
+					'message' => Dewey_Engine::settings_confirmation_for_confirm( $params ),
 					'settings' => $updated,
 				)
 			);
@@ -332,7 +361,80 @@ final class Dewey_REST_Controller {
 	public static function sanitize_question( string $question ): string {
 		$value = wp_strip_all_tags( $question );
 		$value = preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', (string) $value );
-		return mb_substr( trim( (string) $value ), 0, 500 );
+		return self::safe_substr( trim( (string) $value ), 500 );
+	}
+
+	/**
+	 * @param string $prompt
+	 * @return string
+	 */
+	public static function sanitize_assistant_prompt( string $prompt ): string {
+		$value = sanitize_textarea_field( $prompt );
+		$value = preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', (string) $value );
+		return self::safe_substr( trim( (string) $value ), 2400 );
+	}
+
+	/**
+	 * @param string $value
+	 * @param int    $limit
+	 * @return string
+	 */
+	private static function safe_substr( string $value, int $limit ): string {
+		if ( function_exists( 'mb_substr' ) ) {
+			return (string) mb_substr( $value, 0, $limit );
+		}
+
+		return substr( $value, 0, $limit );
+	}
+
+	/**
+	 * Sanitize conversation history sent from the frontend.
+	 *
+	 * Accepts up to 10 turns, each with a 'role' (user|assistant) and a 'text'
+	 * string capped at 500 characters. Invalid entries are silently dropped.
+	 *
+	 * @param mixed $history
+	 * @return array<int,array{role:string,text:string}>
+	 */
+	public static function sanitize_history( $history ): array {
+		if ( ! is_array( $history ) ) {
+			return array();
+		}
+
+		$sanitized = array();
+		foreach ( array_slice( $history, 0, 10 ) as $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+			$role = (string) ( $item['role'] ?? '' );
+			if ( ! in_array( $role, array( 'user', 'assistant' ), true ) ) {
+				continue;
+			}
+			$text = wp_strip_all_tags( (string) ( $item['text'] ?? '' ) );
+			$text = preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', (string) $text );
+			$text = mb_substr( trim( (string) $text ), 0, 500 );
+			if ( '' === $text ) {
+				continue;
+			}
+			$sanitized[] = array(
+				'role' => $role,
+				'text' => $text,
+			);
+		}
+
+		return $sanitized;
+	}
+
+	/**
+	 * Sanitize the page_context string sent from the frontend (window.pagenow).
+	 * Accepts only lowercase alphanumeric characters and hyphens, max 80 chars.
+	 *
+	 * @param mixed $context
+	 * @return string
+	 */
+	public static function sanitize_page_context( $context ): string {
+		$value = sanitize_key( (string) $context );
+		return mb_substr( $value, 0, 80 );
 	}
 
 	/**

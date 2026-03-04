@@ -16,10 +16,12 @@ export default function App() {
 		isSubmitting,
 		isAiConnected,
 		connectionDebug,
+		citationStyle,
 		inputRef,
 		setInputValue,
 		togglePanel,
 		closePanel,
+		clearConversation,
 		handleStarter,
 		handleMessageAction,
 		handleSubmit,
@@ -38,6 +40,8 @@ export default function App() {
 					onStarterSelect={ handleStarter }
 					onMessageAction={ handleMessageAction }
 					onClose={ closePanel }
+					onClearConversation={ clearConversation }
+					citationStyle={ citationStyle }
 					onSubmit={ handleSubmit }
 					inputRef={ inputRef }
 					inputValue={ inputValue }

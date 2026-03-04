@@ -4,7 +4,7 @@ Tags: ai, content search, admin assistant, writing assistant, knowledge base
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 1.0.15
+Stable tag: 1.0.17
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -18,11 +18,13 @@ When teams move fast, memory breaks: strong ideas get buried, duplicate posts ap
 
 Dewey gives editors a better workflow right now:
 
-* Ask plain-English questions in wp-admin.
-* Retrieve relevant matches from your archive with source citations.
-* Generate concise AI answers from that context using WordPress 7.0 AI infrastructure.
-* Verify AI connection status and jump directly to Settings > Connectors.
-* Run a protected reindex flow when you need to refresh indexed retrieval.
+* Ask plain-English questions in wp-admin — conversationally, like talking to a colleague.
+* Get AI answers grounded in your archive with inline citations and source snippets.
+* Follow-up question chips appear after every answer so the conversation stays natural.
+* Page-aware context: Dewey knows which screen you're on and offers relevant suggestions.
+* Post-aware context: when editing a post, Dewey knows the title, status, tags, and categories.
+* Persistent conversation: your chat thread survives page navigations in wp-admin.
+* Verified AI connection with a direct link to Settings > Connectors when a provider is needed.
 
 The result is faster publishing, stronger consistency, and less reinvention.
 
@@ -44,6 +46,25 @@ No. Dewey retrieves relevant excerpts first and sends only the minimum context n
 Dewey runs in wp-admin for authenticated users with appropriate capabilities. Query/status routes are for editors, while maintenance actions like reindex are admin-only.
 
 == Changelog ==
+
+= 1.0.17 =
+* Follow-up question chips: AI generates 3 contextual follow-up questions after each response, rendered as tappable chips for natural conversation continuation.
+* Page-aware proactive opener: Dewey detects the current wp-admin screen (posts list, editor, dashboard, plugins, themes, users, media) and surfaces contextually relevant suggestions when you open the panel.
+* Current post context: when editing a specific post, Dewey knows the title, status, tags, and categories and can reference them without needing to search.
+* Smart return greeting: reopening Dewey within 4 hours of a recent conversation shows a pick-up greeting referencing the last topic discussed.
+* Site stats grounding: published post count, last published date, and top categories are injected into every system instruction so Dewey can cite real numbers without a retrieval call.
+* Copy-to-clipboard button on all assistant messages — hover to reveal, 2-second confirmed feedback.
+* Citation snippet preview: a 2-line excerpt from each matched post is shown below the citation link.
+* Retry button on error messages with Dewey-voiced error copy.
+* Alt+Shift+D keyboard shortcut to open and close the panel from anywhere in wp-admin.
+* Relative message timestamps (just now / X min ago) that update live.
+* Dewey-voiced settings confirmations: changing tone, verbosity, or citation style triggers a specific, on-brand confirmation message.
+* Time-of-day greeting (Morning/Afternoon/Evening/Working late) addressed to the current user's display name.
+
+= 1.0.16 =
+* Reliability: fixed index rebuild pagination so large sites index all matching posts, not just the first batch.
+* Voice consistency: `/query` now accepts and sanitizes `assistant_system_prompt`, and the engine applies Dewey's canonical soul prompt when generating answers.
+* Performance/security polish: tightened frontend connection refresh behavior and kept full quality + security preflight coverage for release readiness.
 
 = 1.0.15 =
 * Dewey now always answers — archive search enriches responses when content matches, AI general knowledge fills in when it doesn't.

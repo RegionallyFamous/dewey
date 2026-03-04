@@ -23,9 +23,11 @@ function DeweyPanel( {
 	isSubmitting,
 	isAiConnected,
 	connectionDebug,
+	citationStyle,
 	onStarterSelect,
 	onMessageAction,
 	onClose,
+	onClearConversation,
 	onSubmit,
 	inputRef,
 	inputValue,
@@ -75,6 +77,14 @@ function DeweyPanel( {
 				</div>
 				<Button
 					variant="tertiary"
+					className="dewey-panel__clear"
+					icon="update"
+					label={ __( 'New conversation', 'dewey' ) }
+					showTooltip
+					onClick={ onClearConversation }
+				/>
+				<Button
+					variant="tertiary"
 					className="dewey-panel__close"
 					icon="no-alt"
 					label={ __( 'Close Dewey panel', 'dewey' ) }
@@ -108,6 +118,8 @@ function DeweyPanel( {
 			<MessageList
 				messages={ messages }
 				hasAskedStarter={ hasAskedStarter }
+				isSubmitting={ isSubmitting }
+				citationStyle={ citationStyle }
 				onStarterSelect={ onStarterSelect }
 				onMessageAction={ onMessageAction }
 			/>
