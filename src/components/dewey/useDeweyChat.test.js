@@ -2,7 +2,7 @@
 
 import { act, renderHook } from '@testing-library/react';
 import { NO_AI_MESSAGE, STARTER_ACTIONS, STORAGE_KEYS } from './copy';
-import { useDeweyChat } from './useDeweyChat';
+import { detectAiConnection, useDeweyChat } from './useDeweyChat';
 import { useDewey } from './useDewey';
 
 jest.mock( './useDewey', () => ( {
@@ -31,6 +31,7 @@ describe( 'useDeweyChat', () => {
 		window.localStorage.clear();
 		window.deweyConfig = undefined;
 		window.wp = undefined;
+		window.fetch = undefined;
 		handlers = createDeweyHandlers();
 		useDewey.mockReturnValue( {
 			deweyState: 'idle',
@@ -154,5 +155,99 @@ describe( 'useDeweyChat', () => {
 		expect( result.current.messages[ 0 ].id ).toBe( 'welcome' );
 		expect( result.current.messages.length ).toBeLessThanOrEqual( 80 );
 		nowSpy.mockRestore();
+	} );
+
+	it( 'reads aiConnected as a proper boolean from deweyConfig', () => {
+		window.deweyConfig = { aiConnected: true };
+		expect( detectAiConnection() ).toBe( true );
+
+		window.deweyConfig = { aiConnected: false };
+		expect( detectAiConnection() ).toBe( false );
+
+		window.deweyConfig = undefined;
+		expect( detectAiConnection() ).toBe( false );
+	} );
+
+	it( 'uses Dewey REST query flow when AI is connected', async () => {
+		window.deweyConfig = {
+			aiConnected: true,
+			restBase: 'https://example.com/wp-json/dewey/v1',
+			nonce: 'valid-nonce',
+		};
+		window.fetch = jest.fn().mockResolvedValue( {
+			ok: true,
+			json: async () => ( {
+				answer: 'Use your onboarding checklist post from May.',
+				citations: [
+					{
+						post_id: 42,
+						title: 'Onboarding Checklist',
+						permalink: 'https://example.com/onboarding-checklist',
+						snippet: 'Start with a first-7-days checklist.',
+					},
+				],
+			} ),
+		} );
+
+		const { result } = renderHook( () => useDeweyChat() );
+		act( () => {
+			result.current.setInputValue(
+				'What did we publish on onboarding?'
+			);
+		} );
+		await act( async () => {
+			await result.current.handleSubmit( {
+				preventDefault: jest.fn(),
+			} );
+		} );
+
+		expect( window.fetch ).toHaveBeenCalledWith(
+			'https://example.com/wp-json/dewey/v1/query',
+			expect.objectContaining( {
+				method: 'POST',
+				headers: expect.objectContaining( {
+					'X-WP-Nonce': 'valid-nonce',
+				} ),
+			} )
+		);
+		const lastMessage =
+			result.current.messages[ result.current.messages.length - 1 ];
+		expect( lastMessage.text ).toBe(
+			'Use your onboarding checklist post from May.'
+		);
+		expect( lastMessage.citations ).toHaveLength( 1 );
+		expect( handlers.onAnswerReady ).toHaveBeenCalledWith( 1 );
+	} );
+
+	it( 'executes confirm actions through /confirm-action', async () => {
+		window.deweyConfig = {
+			aiConnected: true,
+			restBase: 'https://example.com/wp-json/dewey/v1',
+			nonce: 'valid-nonce',
+		};
+		window.fetch = jest.fn().mockResolvedValue( {
+			ok: true,
+			json: async () => ( {
+				message: 'Confirmed: settings updated.',
+			} ),
+		} );
+		const { result } = renderHook( () => useDeweyChat() );
+
+		await act( async () => {
+			await result.current.handleMessageAction( {
+				kind: 'confirm',
+				token: 'test-token',
+			} );
+		} );
+
+		expect( window.fetch ).toHaveBeenCalledWith(
+			'https://example.com/wp-json/dewey/v1/confirm-action',
+			expect.objectContaining( {
+				method: 'POST',
+			} )
+		);
+		const lastMessage =
+			result.current.messages[ result.current.messages.length - 1 ];
+		expect( lastMessage.text ).toBe( 'Confirmed: settings updated.' );
 	} );
 } );

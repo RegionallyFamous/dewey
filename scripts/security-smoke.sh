@@ -25,6 +25,13 @@ if [[ -z "$BASE_URL" || -z "$COOKIE" || -z "$NONCE" ]]; then
 fi
 
 API="${BASE_URL%/}/wp-json/dewey/v1"
+probe_status="$(curl -sS -o /dev/null -w "%{http_code}" "${API}/status" || true)"
+
+if [[ "$probe_status" == "404" ]]; then
+	echo "FAIL: Dewey REST routes are not available at ${API} (status 404)."
+	echo "Expected live engine endpoints to be registered."
+	exit 1
+fi
 
 curl_status() {
 	local method="$1"

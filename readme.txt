@@ -4,23 +4,25 @@ Tags: ai, content search, admin assistant, writing assistant, knowledge base
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 1.0.9
+Stable tag: 1.0.11
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Your best content is already written. Dewey helps your team rediscover it fast and turn archive knowledge into confident publishing decisions.
+Your best content is already written. Dewey helps your team query your archive in wp-admin and get grounded AI answers with citations.
 
 == Description ==
 
-Dewey turns your WordPress archive into an active writing partner.
+Dewey brings your editorial memory into wp-admin so your team can move faster with less reinvention.
 
 When teams move fast, memory breaks: strong ideas get buried, duplicate posts appear, and voice drifts.
 
-Dewey gives editors a better workflow:
+Dewey gives editors a better workflow right now:
 
 * Ask plain-English questions in wp-admin.
-* Pull relevant context from what you have already published.
-* Respond with source-backed guidance so decisions are grounded, not guessed.
+* Retrieve relevant matches from your archive with source citations.
+* Generate concise AI answers from that context using WordPress 7.0 AI infrastructure.
+* Verify AI connection status and jump directly to Settings > Connectors.
+* Run a protected reindex flow when you need to refresh indexed retrieval.
 
 The result is faster publishing, stronger consistency, and less reinvention.
 
@@ -28,20 +30,34 @@ The result is faster publishing, stronger consistency, and less reinvention.
 
 1. Upload the plugin files to the `/wp-content/plugins/dewey` directory, or install via the WordPress plugin screen.
 2. Activate the plugin through the "Plugins" screen in WordPress.
-3. Configure your AI provider in `Settings > AI > Connectors`.
+3. Configure your AI provider in `Settings > Connectors`.
 4. Open wp-admin and use the Dewey panel.
 
 == Frequently Asked Questions ==
 
 = Does Dewey send all my content to the AI provider? =
 
-No. Dewey is designed to retrieve relevant excerpts first and send only the context needed to answer the question.
+No. Dewey retrieves relevant excerpts first and sends only the minimum context needed to answer your question.
 
 = Who can use Dewey? =
 
-Dewey endpoints are permission-gated and intended for authenticated WordPress users with appropriate capabilities.
+Dewey runs in wp-admin for authenticated users with appropriate capabilities. Query/status routes are for editors, while maintenance actions like reindex are admin-only.
 
 == Changelog ==
+
+= 1.0.11 =
+* Added Dewey REST engine endpoints (`/query`, `/status`, `/reindex`, `/confirm-action`) with server-side retrieval and AI answer generation.
+* Added indexed retrieval scaffold with protected reindex operations and status reporting.
+* Added capability, nonce, and per-route rate-limit guardrails for engine routes.
+* Wired the chat UI to live Dewey API responses with citation rendering and confirm-action flow support.
+* Fixed AI connection status detection: switched config injection from wp_localize_script to wp_add_inline_script + wp_json_encode so PHP booleans arrive in JavaScript as real booleans, not strings.
+* Updated AI detection to align with WordPress AI Client APIs and Connectors-backed provider configuration checks.
+* Fixed Connectors link always resolving to the correct Settings → Connectors URL.
+* Corrected duplicate ARIA labelling on the chat dialog (aria-label shadowed by aria-labelledby).
+
+= 1.0.10 =
+* Release packaging refresh for the latest Dewey chat UX, AI-connection clarity, and localization readiness updates.
+* Verified current dependency set, docs, and quality gates before distributing this build.
 
 = 1.0.9 =
 * Release readiness refresh: dependency updates, final QA pass, and packaging/tooling verification for current build pipeline.

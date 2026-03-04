@@ -15,8 +15,16 @@ import './index.css';
 
 // Mount when DOM is ready
 window.addEventListener( 'DOMContentLoaded', () => {
-	const container = document.createElement( 'div' );
-	container.id = 'dewey-root';
-	document.body.appendChild( container );
+	if ( ! document.body ) {
+		return;
+	}
+
+	let container = document.getElementById( 'dewey-root' );
+	if ( ! container ) {
+		container = document.createElement( 'div' );
+		container.id = 'dewey-root';
+		document.body.appendChild( container );
+	}
+
 	render( <App />, container );
 } );

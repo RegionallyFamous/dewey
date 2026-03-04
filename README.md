@@ -1,106 +1,60 @@
 # Dewey for WordPress
 
-Dewey helps your team rediscover what your site already knows, so your best ideas stop getting buried in old posts.
+**Turn old posts into present-moment leverage.**
+
+Dewey is your editorial memory inside wp-admin.  
+Instead of rewriting what your team already figured out, Dewey helps you surface prior insight fast, stay consistent, and ship with confidence.
 
 Built by [Regionally Famous](https://regionallyfamous.com).
 
-## Why Dewey Matters
+## Why Teams Use Dewey
 
-Most teams are not short on ideas. They are short on recall.
+- **Recover buried thinking quickly** before it gets rewritten from scratch.
+- **Keep voice and positioning tight** by grounding decisions in your own archive.
+- **Reduce editorial thrash** when deadlines are close and context is scattered.
+- **Move from “I know we wrote this” to “here it is”** in one place.
 
-When deadlines hit, valuable insights disappear into old posts, duplicated work sneaks in, and messaging drifts. Dewey closes that gap by turning your archive into an active editorial asset:
+## What You Get Today
 
-- Find prior thinking before you rewrite it from scratch.
-- Ground decisions in source-backed context from your own site.
-- Publish faster while keeping voice and positioning consistent.
-
-## Current Scope (v1.0.9)
-
-This repository currently ships:
-
-- A floating Dewey panel in wp-admin.
-- Local chat UX with starter prompts and Dewey state animations.
-- AI-connection detection messaging from WordPress AI configuration.
-- Settings sanitization and an intent router utility class.
-
-This repository does **not** currently ship live archive retrieval or REST routes in plugin PHP.
+- A polished floating Dewey assistant in wp-admin.
+- Live archive query and answer flow via Dewey REST endpoints.
+- Server-side retrieval + generation pipeline built on WordPress 7.0 AI infrastructure.
+- Conversational starter flows with Dewey voice and stateful character animation.
+- Clear AI-connection guidance when a provider is not configured.
+- Hardened plugin foundation with capability, nonce, and rate-limit guardrails.
 
 ## Requirements
 
 - WordPress `7.0+`
 - PHP `8.1+`
 
-## Installation
+## Get Started
+
+1. Install dependencies and build assets.
+2. Drop `dewey/` into `wp-content/plugins/`.
+3. Activate in WordPress admin.
+4. Click Dewey and start asking.
+
+## Localization
+
+Generate or refresh the translation template (`.pot`):
 
 ```bash
-# 1) Install JS dependencies
-npm install
-
-# 2) Build plugin assets
-npm run build
-
-# 3) Copy dewey/ into wp-content/plugins/
-# 4) Activate plugin in WP Admin
+npm run i18n:pot
 ```
 
-For development:
+This writes `languages/dewey.pot` for translators and GlotPress/import workflows.
 
-```bash
-npm run start
-```
+## Wiki (Technical Docs)
 
-## Testing and Checks
+The long-form technical details now live in the wiki docs:
 
-```bash
-# JS/CSS lint
-npm run lint
-
-# Frontend unit tests
-npm run test:js
-
-# PHP class tests (router/settings)
-npm run test:php
-
-# Docs + security baseline checks
-npm run check
-```
-
-## Releasing a New Plugin Version
-
-```bash
-# Full preflight checks + build + packaging
-npm run release -- 1.0.9
-
-# Dry run (no zip write, no build)
-npm run release:dry-run -- 1.0.9 --skip-build
-```
-
-Release archives are generated in `releases/` as `dewey-<version>.zip`.
-
-## Project Structure
-
-```text
-dewey/
-├── dewey.php
-├── build/
-├── includes/
-│   ├── class-dewey-intent-router.php
-│   └── class-dewey-settings.php
-├── src/
-│   └── components/dewey/
-├── scripts/
-│   ├── release-plugin.js
-│   ├── check-docs-consistency.js
-│   └── check-security-basics.js
-└── readme.txt
-```
-
-## Roadmap
-
-- Wire chat UI to real plugin REST endpoints.
-- Add archive retrieval/indexing pipeline.
-- Expand automated PHP/JS test coverage.
-- Add CI gates for release and WordPress.org submission flow.
+- [Wiki Home](docs/wiki/Home.md)
+- [Getting Started](docs/wiki/Getting-Started.md)
+- [Architecture and Scope](docs/wiki/Architecture-and-Scope.md)
+- [Developer Guide](docs/wiki/Developer-Guide.md)
+- [Release Checklist](docs/wiki/Release-Checklist.md)
+- [Security Model](docs/THREAT_MODEL.md)
 
 ## License
 

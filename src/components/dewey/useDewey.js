@@ -15,7 +15,13 @@
  *   deweyHandlers.onError();
  */
 
-import { useState, useCallback, useEffect, useRef } from '@wordpress/element';
+import {
+	useState,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+} from '@wordpress/element';
 
 // How many posts triggers the "dancing" state vs "found"
 const DANCE_THRESHOLD = 5;
@@ -149,9 +155,8 @@ export function useDewey( initialState = 'idle' ) {
 		[ clearTimers ]
 	);
 
-	return {
-		deweyState,
-		deweyHandlers: {
+	const deweyHandlers = useMemo(
+		() => ( {
 			onQueryStart,
 			onPostsFound,
 			onAnswerReady,
@@ -161,6 +166,22 @@ export function useDewey( initialState = 'idle' ) {
 			onFirstOpen,
 			onTired,
 			setDewey,
-		},
+		} ),
+		[
+			onQueryStart,
+			onPostsFound,
+			onAnswerReady,
+			onNoResults,
+			onError,
+			onShock,
+			onFirstOpen,
+			onTired,
+			setDewey,
+		]
+	);
+
+	return {
+		deweyState,
+		deweyHandlers,
 	};
 }

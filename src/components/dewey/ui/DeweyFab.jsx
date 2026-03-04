@@ -3,7 +3,9 @@
  */
 
 import { memo, useEffect, useState } from '@wordpress/element';
+import { __ } from '@wordpress/i18n';
 import Dewey from '../Dewey';
+import SimpleDeweyMark from './SimpleDeweyMark';
 
 const MOBILE_UI_QUERY = '(max-width: 782px), (pointer: coarse)';
 
@@ -52,12 +54,18 @@ function DeweyFab( { isOpen, onToggle } ) {
 			className={ `dewey-fab ${ isOpen ? 'dewey-fab--open' : '' }` }
 			aria-expanded={ isOpen }
 			aria-controls="dewey-panel"
-			aria-label={ isOpen ? 'Close Dewey chat' : 'Open Dewey chat' }
+			aria-label={
+				isOpen
+					? __( 'Close Dewey chat', 'dewey' )
+					: __( 'Open Dewey chat', 'dewey' )
+			}
 			onClick={ onToggle }
 		>
 			<span className="dewey-fab__icon" aria-hidden="true">
 				{ isMobileUi ? (
-					<span className="dewey-fab__emoji">📚</span>
+					<span className="dewey-fab__emoji">
+						<SimpleDeweyMark />
+					</span>
 				) : (
 					<Dewey
 						state={ isOpen ? 'hello' : 'idle' }

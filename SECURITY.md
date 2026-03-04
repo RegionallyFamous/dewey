@@ -8,7 +8,7 @@ If you discover a vulnerability, report it privately to the maintainer before pu
 
 - Include affected version, attack path, proof of concept, and impact.
 
-## Current Security Controls (v1.0.9)
+## Current Security Controls (v1.0.11)
 
 - Direct access guards in PHP files (`defined( 'ABSPATH' ) || exit;`).
 - Strict settings sanitization/allowlisting in `Dewey_Settings`.
@@ -17,6 +17,8 @@ If you discover a vulnerability, report it privately to the maintainer before pu
 - Asset manifest normalization before script/style registration (defensive type checks).
 - Frontend prompt input normalization (control-char stripping and max-length guard).
 - Frontend submit throttling and bounded in-memory chat history.
+- REST route capability and nonce checks for query/status/reindex/confirm-action.
+- Per-route, per-user server-side rate limiting with 429 responses.
 - Build/release preflight checks (lint, tests, docs consistency, security scan).
 - Release packaging hardening:
   - slug validation,
@@ -36,8 +38,12 @@ If you discover a vulnerability, report it privately to the maintainer before pu
 
 ## Current Scope Notes
 
-- This repository does not currently ship Dewey REST endpoints.
-- Security statements about nonce/capability checks for Dewey REST routes will be added when those routes are implemented.
+- This repository ships Dewey REST endpoints at `/wp-json/dewey/v1/`:
+  - `POST /query`
+  - `GET /status`
+  - `POST /reindex`
+  - `POST /confirm-action`
+- Query and status are editor-capable routes, while reindex and confirm-action are admin-only.
 
 ## Pre-Release Security Checklist
 

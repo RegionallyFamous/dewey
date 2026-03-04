@@ -4,18 +4,33 @@
 
 import { memo, useEffect, useMemo } from '@wordpress/element';
 import { Button, TextControl } from '@wordpress/components';
+import { __ } from '@wordpress/i18n';
 import MessageList from './MessageList';
+
+function resolveConnectorsUrl() {
+	// PHP injects the canonical URL via admin_url() + wp_json_encode.
+	// Trust it directly; only fall back if somehow absent.
+	const localizedUrl = window.deweyConfig?.connectorsUrl;
+	if ( typeof localizedUrl === 'string' && localizedUrl.trim() !== '' ) {
+		return localizedUrl;
+	}
+	return '/wp-admin/options-general.php?page=connectors-wp-admin';
+}
 
 function DeweyPanel( {
 	messages,
 	hasAskedStarter,
+	isSubmitting,
+	isAiConnected,
 	onStarterSelect,
+	onMessageAction,
 	onClose,
 	onSubmit,
 	inputRef,
 	inputValue,
 	onInputChange,
 } ) {
+	const connectorsUrl = useMemo( () => resolveConnectorsUrl(), [] );
 	const isSubmitDisabled = useMemo(
 		() => ! inputValue.trim(),
 		[ inputValue ]
@@ -39,36 +54,62 @@ function DeweyPanel( {
 			role="dialog"
 			aria-modal="false"
 			aria-labelledby={ titleId }
-			aria-label="Dewey panel"
 		>
 			<header className="dewey-panel__header">
 				<div id={ titleId } className="dewey-panel__title">
-					<span>Dewey</span>
+					<span>{ __( 'Ask Dewey', 'dewey' ) }</span>
+				</div>
+				<div
+					className={ `dewey-panel__connection ${
+						isAiConnected
+							? 'dewey-panel__connection--connected'
+							: 'dewey-panel__connection--disconnected'
+					}` }
+					role="status"
+					aria-live="polite"
+				>
+					{ isAiConnected
+						? __( 'AI connected', 'dewey' )
+						: __( 'AI not connected', 'dewey' ) }
 				</div>
 				<Button
 					variant="tertiary"
 					className="dewey-panel__close"
 					icon="no-alt"
-					label="Close Dewey panel"
+					label={ __( 'Close Dewey panel', 'dewey' ) }
 					onClick={ onClose }
 				/>
 			</header>
+
+			{ ! isAiConnected && (
+				<div className="dewey-panel__notice" role="note">
+					{ __( 'Connect an AI provider in', 'dewey' ) }{ ' ' }
+					<a
+						href={ connectorsUrl }
+						className="dewey-panel__notice-link"
+					>
+						{ __( 'Settings -> Connectors', 'dewey' ) }
+					</a>{ ' ' }
+					{ __( 'to get full archive answers.', 'dewey' ) }
+				</div>
+			) }
 
 			<MessageList
 				messages={ messages }
 				hasAskedStarter={ hasAskedStarter }
 				onStarterSelect={ onStarterSelect }
+				onMessageAction={ onMessageAction }
 			/>
 
 			<form className="dewey-panel__form" onSubmit={ onSubmit }>
 				<TextControl
 					ref={ inputRef }
 					className="dewey-panel__input-control"
-					label="Ask Dewey"
+					label={ __( 'Ask Dewey', 'dewey' ) }
 					hideLabelFromVision
 					value={ inputValue }
 					onChange={ onInputChange }
-					placeholder="Ask Dewey..."
+					placeholder={ __( 'Ask Dewey…', 'dewey' ) }
 					maxLength={ 500 }
 					autoComplete="off"
 					spellCheck={ false }
@@ -80,9 +121,9 @@ function DeweyPanel( {
 					className="dewey-panel__submit"
 					variant="primary"
 					icon="arrow-up-alt2"
-					label="Send message"
+					label={ __( 'Send message', 'dewey' ) }
 					showTooltip={ false }
-					disabled={ isSubmitDisabled }
+					disabled={ isSubmitDisabled || isSubmitting }
 				/>
 			</form>
 		</section>

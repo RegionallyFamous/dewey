@@ -40,22 +40,22 @@ describe( 'App integration', () => {
 	} );
 
 	it( 'opens with FAB, closes with panel close button, reopens with FAB', () => {
-		const { container, getByLabelText, queryByLabelText } = render(
+		const { container, getByRole, queryByRole, getByLabelText } = render(
 			<App />
 		);
 		const fab = container.querySelector( '.dewey-fab' );
 
 		expect( fab ).not.toBeNull();
-		expect( queryByLabelText( 'Dewey panel' ) ).toBeNull();
+		expect( queryByRole( 'dialog' ) ).toBeNull();
 
 		fireEvent.click( fab );
-		expect( getByLabelText( 'Dewey panel' ) ).not.toBeNull();
+		expect( getByRole( 'dialog' ) ).not.toBeNull();
 
 		fireEvent.click( getByLabelText( 'Close Dewey panel' ) );
-		expect( queryByLabelText( 'Dewey panel' ) ).toBeNull();
+		expect( queryByRole( 'dialog' ) ).toBeNull();
 
 		fireEvent.click( fab );
-		expect( getByLabelText( 'Dewey panel' ) ).not.toBeNull();
+		expect( getByRole( 'dialog' ) ).not.toBeNull();
 	} );
 
 	it( 'auto-opens on first load with welcome and starter prompts', () => {
@@ -66,8 +66,8 @@ describe( 'App integration', () => {
 			deweyHandlers: firstOpenHandlers,
 		} );
 
-		const { getByLabelText, getByText } = render( <App /> );
-		expect( getByLabelText( 'Dewey panel' ) ).not.toBeNull();
+		const { getByRole, getByText } = render( <App /> );
+		expect( getByRole( 'dialog' ) ).not.toBeNull();
 		expect( getByText( FIRST_OPEN_MESSAGE ) ).not.toBeNull();
 		expect( getByText( STARTER_ACTIONS[ 0 ].label ) ).not.toBeNull();
 		expect( firstOpenHandlers.onFirstOpen ).toHaveBeenCalledTimes( 1 );
@@ -82,14 +82,14 @@ describe( 'App integration', () => {
 			deweyHandlers: disconnectedHandlers,
 		} );
 
-		const { container, getByLabelText, getByPlaceholderText, getByText } =
+		const { container, getByRole, getByPlaceholderText, getByText } =
 			render( <App /> );
 		const fab = container.querySelector( '.dewey-fab' );
 
 		fireEvent.click( fab );
-		expect( getByLabelText( 'Dewey panel' ) ).not.toBeNull();
+		expect( getByRole( 'dialog' ) ).not.toBeNull();
 
-		const input = getByPlaceholderText( 'Ask Dewey...' );
+		const input = getByPlaceholderText( /Ask Dewey/ );
 		fireEvent.change( input, {
 			target: {
 				value: 'Give me a summary of my strongest onboarding posts.',
@@ -103,15 +103,54 @@ describe( 'App integration', () => {
 	} );
 
 	it( 'closes the panel with Escape key', () => {
-		const { container, getByLabelText, queryByLabelText } = render(
-			<App />
-		);
+		const { container, getByRole, queryByRole } = render( <App /> );
 		const fab = container.querySelector( '.dewey-fab' );
 
 		fireEvent.click( fab );
-		expect( getByLabelText( 'Dewey panel' ) ).not.toBeNull();
+		expect( getByRole( 'dialog' ) ).not.toBeNull();
 
 		fireEvent.keyDown( window, { key: 'Escape' } );
-		expect( queryByLabelText( 'Dewey panel' ) ).toBeNull();
+		expect( queryByRole( 'dialog' ) ).toBeNull();
+	} );
+
+	it( 'renders live query answer and citation when connected', async () => {
+		window.deweyConfig = {
+			aiConnected: true,
+			restBase: 'https://example.com/wp-json/dewey/v1',
+			nonce: 'valid-nonce',
+		};
+		window.fetch = jest.fn().mockResolvedValue( {
+			ok: true,
+			json: async () => ( {
+				answer: 'Your strongest onboarding article is still relevant.',
+				citations: [
+					{
+						post_id: 9,
+						title: 'Onboarding Guide',
+						permalink: 'https://example.com/onboarding-guide',
+						snippet: 'Start with expectations and first wins.',
+					},
+				],
+			} ),
+		} );
+
+		const { container, findByText, getByPlaceholderText } = render(
+			<App />
+		);
+		const fab = container.querySelector( '.dewey-fab' );
+		fireEvent.click( fab );
+
+		const input = getByPlaceholderText( /Ask Dewey/ );
+		fireEvent.change( input, {
+			target: { value: 'What was our onboarding guidance?' },
+		} );
+		fireEvent.submit( input.closest( 'form' ) );
+
+		expect(
+			await findByText(
+				'Your strongest onboarding article is still relevant.'
+			)
+		).not.toBeNull();
+		expect( await findByText( 'Onboarding Guide' ) ).not.toBeNull();
 	} );
 } );

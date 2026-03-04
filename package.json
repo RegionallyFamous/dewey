@@ -1,6 +1,6 @@
 {
   "name": "dewey",
-  "version": "1.0.9",
+  "version": "1.0.11",
   "private": true,
   "description": "Dewey WordPress plugin admin UI and release tooling.",
   "scripts": {
@@ -11,6 +11,7 @@
     "lint": "npm run lint:js && npm run lint:css",
     "test:js": "wp-scripts test-unit-js",
     "test:php": "php ./tests/php/dewey-core-tests.php",
+    "i18n:pot": "wp i18n make-pot . languages/dewey.pot --domain=dewey --exclude=node_modules,build,releases,tests",
     "check:docs": "node ./scripts/check-docs-consistency.js",
     "check:security": "node ./scripts/check-security-basics.js",
     "check": "npm run check:docs && npm run check:security",
@@ -19,7 +20,8 @@
   },
   "dependencies": {
     "@wordpress/components": "^32.2.0",
-    "@wordpress/element": "^6.0.0"
+    "@wordpress/element": "^6.0.0",
+    "@wordpress/i18n": "^6.13.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.0",

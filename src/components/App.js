@@ -13,11 +13,14 @@ export default function App() {
 		inputValue,
 		messages,
 		hasAskedStarter,
+		isSubmitting,
+		isAiConnected,
 		inputRef,
 		setInputValue,
 		togglePanel,
 		closePanel,
 		handleStarter,
+		handleMessageAction,
 		handleSubmit,
 	} = useDeweyChat();
 
@@ -28,7 +31,10 @@ export default function App() {
 				<DeweyPanel
 					messages={ messages }
 					hasAskedStarter={ hasAskedStarter }
+					isSubmitting={ isSubmitting }
+					isAiConnected={ isAiConnected }
 					onStarterSelect={ handleStarter }
+					onMessageAction={ handleMessageAction }
 					onClose={ closePanel }
 					onSubmit={ handleSubmit }
 					inputRef={ inputRef }

@@ -124,62 +124,85 @@ if (!skipBuild) {
 
 const releaseName = `${pluginSlug}-${versionArg}`;
 const outputZip = path.join(DIST_DIR, `${releaseName}.zip`);
-const stagingRoot = fs.mkdtempSync(path.join(os.tmpdir(), `${pluginSlug}-release-`));
-const stagedPluginRoot = path.join(stagingRoot, STAGE_PLUGIN_DIR);
-assertPathWithin(DIST_DIR, outputZip);
+let stagingRoot = '';
+let releaseFailed = false;
 
-fs.mkdirSync(stagedPluginRoot, { recursive: true });
-fs.mkdirSync(DIST_DIR, { recursive: true });
+try {
+	stagingRoot = fs.mkdtempSync(path.join(os.tmpdir(), `${pluginSlug}-release-`));
+	const stagedPluginRoot = path.join(stagingRoot, STAGE_PLUGIN_DIR);
+	assertPathWithin(DIST_DIR, outputZip);
 
-const pathsToShip = [
-	pluginEntry,
-	'readme.txt',
-	'build',
-	'includes',
-	'languages',
-	'assets',
-	'uninstall.php',
-	'LICENSE',
-	'license.txt',
-];
+	fs.mkdirSync(stagedPluginRoot, { recursive: true });
+	fs.mkdirSync(DIST_DIR, { recursive: true });
 
-for (const relPath of pathsToShip) {
-	if (!existsInRoot(relPath)) {
-		continue;
+	const pathsToShip = [
+		pluginEntry,
+		'readme.txt',
+		'build',
+		'includes',
+		'languages',
+		'assets',
+		'uninstall.php',
+		'LICENSE',
+		'license.txt',
+	];
+
+	for (const relPath of pathsToShip) {
+		if (!existsInRoot(relPath)) {
+			continue;
+		}
+		copyRecursive(
+			path.join(ROOT, relPath),
+			path.join(stagedPluginRoot, relPath),
+			stagedPluginRoot
+		);
 	}
-	copyRecursive(path.join(ROOT, relPath), path.join(stagedPluginRoot, relPath));
+
+	if (fs.existsSync(outputZip)) {
+		fs.unlinkSync(outputZip);
+	}
+
+	if (isDryRun) {
+		console.log(`[dry-run] Staged release at: ${stagedPluginRoot}`);
+		console.log(`[dry-run] Would create archive: ${outputZip}`);
+	} else {
+		console.log(`Creating zip archive: ${outputZip}`);
+		run('zip', ['-rqX', outputZip, STAGE_PLUGIN_DIR], { cwd: stagingRoot });
+		console.log(`Release package created: ${outputZip}`);
+	}
+} catch (err) {
+	releaseFailed = true;
+	console.error(`Release failed: ${err.message}`);
+} finally {
+	if (stagingRoot && (releaseFailed || !isDryRun)) {
+		fs.rmSync(stagingRoot, { recursive: true, force: true });
+	}
 }
 
-if (fs.existsSync(outputZip)) {
-	fs.unlinkSync(outputZip);
+if (releaseFailed) {
+	process.exit(1);
 }
-
-if (isDryRun) {
-	console.log(`[dry-run] Staged release at: ${stagedPluginRoot}`);
-	console.log(`[dry-run] Would create archive: ${outputZip}`);
-	process.exit(0);
-}
-
-console.log(`Creating zip archive: ${outputZip}`);
-run('zip', ['-rqX', outputZip, STAGE_PLUGIN_DIR], { cwd: stagingRoot });
-
-console.log(`Release package created: ${outputZip}`);
 
 function existsInRoot(relPath) {
 	return fs.existsSync(path.join(ROOT, relPath));
 }
 
 function run(cmd, args, options = {}) {
-	execFileSync(cmd, args, {
-		stdio: 'inherit',
-		cwd: ROOT,
-		...options,
-	});
+	try {
+		execFileSync(cmd, args, {
+			stdio: 'inherit',
+			cwd: ROOT,
+			...options,
+		});
+	} catch (err) {
+		const detail = err && err.message ? `\n${err.message}` : '';
+		throw new Error(`Command failed: ${cmd} ${args.join(' ')}${detail}`);
+	}
 }
 
-function copyRecursive(src, dest) {
+function copyRecursive(src, dest, packageRoot) {
 	assertPathWithin(ROOT, src);
-	assertPathWithin(stagedPluginRoot, dest);
+	assertPathWithin(packageRoot, dest);
 	const stat = fs.lstatSync(src);
 	if (stat.isSymbolicLink()) {
 		throw new Error(`Refusing to package symlink: ${src}`);
@@ -187,7 +210,7 @@ function copyRecursive(src, dest) {
 	if (stat.isDirectory()) {
 		fs.mkdirSync(dest, { recursive: true });
 		for (const entry of fs.readdirSync(src)) {
-			copyRecursive(path.join(src, entry), path.join(dest, entry));
+			copyRecursive(path.join(src, entry), path.join(dest, entry), packageRoot);
 		}
 		return;
 	}

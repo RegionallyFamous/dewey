@@ -4,6 +4,8 @@
  * Canonical Dewey voice strings and starter prompts.
  */
 
+import { __ } from '@wordpress/i18n';
+
 export const STORAGE_KEYS = {
 	openedOnce: 'dewey.hasOpenedOnce',
 };
@@ -11,36 +13,43 @@ export const STORAGE_KEYS = {
 export const STARTER_ACTIONS = [
 	{
 		id: 'what-can-you-do',
-		label: 'What can you do?',
-		reply: "I am your archive guide. I can comb through your posts, pull the strongest matches, and answer with source-backed context so you're never guessing.",
+		label: __( 'What can you do?', 'dewey' ),
+		reply: __(
+			'I help your team get oriented quickly with guided prompts, workflow support, and AI connection readiness for full archive answers.',
+			'dewey'
+		),
 	},
 	{
 		id: 'how-does-this-work',
-		label: 'How does this work?',
-		reply: 'Ask in plain language, like you would ask a teammate. I search your archive first, then shape a clear answer and point you to the posts it came from.',
-	},
-	{
-		id: 'what-should-i-ask',
-		label: 'What should I ask?',
-		reply: 'Try prompts like: "What have I written about onboarding?" or "Summarize my best advice for first-time founders." Specific questions get better answers.',
+		label: __( 'How does this work?', 'dewey' ),
+		reply: __(
+			'Ask in plain language, like you would ask a teammate. In this build I provide startup guidance and connection checks while live archive answers are being finalized.',
+			'dewey'
+		),
 	},
 ];
 
-export const FIRST_OPEN_MESSAGE =
-	'Hello, I am Dewey. I help you rediscover what your site already knows: answers from your own archive, with sources you can verify.';
+export const FIRST_OPEN_MESSAGE = __(
+	'Hello, I am Dewey. I am your in-admin editorial guide for faster decisions, clearer direction, and AI-ready archive workflows.',
+	'dewey'
+);
 
-export const NO_AI_MESSAGE =
-	'I can still answer startup questions, but for full archive answers I need an AI service connected first. Open Settings -> AI -> Connectors, connect a provider, then come right back and I will take it from there.';
+export const NO_AI_MESSAGE = __(
+	'I can still answer startup questions, but for full archive answers I need an AI service connected first. Open Settings -> Connectors, connect a provider, then come right back and I will take it from there.',
+	'dewey'
+);
 
-export const CONNECTED_PLACEHOLDER_MESSAGE =
-	'I am connected and ready. Live archive querying is not wired in this build yet, but your connection is set and I can answer startup guidance.';
+export const CONNECTED_PLACEHOLDER_MESSAGE = __(
+	'I am connected and ready to query your archive.',
+	'dewey'
+);
 
 export function getSpeechText( deweyState, isAiConnected ) {
 	if ( deweyState === 'hello' ) {
-		return 'Hey there. Need the quick tour?';
+		return __( 'Hey there. Need the quick tour?', 'dewey' );
 	}
 	if ( deweyState === 'sad' && ! isAiConnected ) {
-		return 'I need an AI connection for full answers.';
+		return __( 'I need an AI connection for full answers.', 'dewey' );
 	}
-	return 'Ask me about your archive.';
+	return __( 'Ask me about your archive.', 'dewey' );
 }

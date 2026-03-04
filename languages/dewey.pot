@@ -1,0 +1,253 @@
+# Copyright (C) 2026 Regionally Famous
+# This file is distributed under the GPL-2.0-or-later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Dewey AI Search Assistant 1.0.11\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/dewey\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-03-04T00:54:35+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: dewey\n"
+
+#. Plugin Name of the plugin
+#: dewey.php
+msgid "Dewey AI Search Assistant"
+msgstr ""
+
+#. Plugin URI of the plugin
+#: dewey.php
+msgid "https://github.com/regionally-famous/dewey"
+msgstr ""
+
+#. Description of the plugin
+#: dewey.php
+msgid "Dewey brings live archive query and AI answers into wp-admin, with citations and built-in guardrails powered by WordPress 7.0 core capabilities."
+msgstr ""
+
+#. Author of the plugin
+#: dewey.php
+msgid "Regionally Famous"
+msgstr ""
+
+#. Author URI of the plugin
+#: dewey.php
+msgid "https://regionallyfamous.com"
+msgstr ""
+
+#. translators: %s: action description
+#: includes/class-dewey-engine.php:37
+#, php-format
+msgid "Please confirm this change before I proceed: %s."
+msgstr ""
+
+#: includes/class-dewey-engine.php:38
+msgid "Apply settings change"
+msgstr ""
+
+#: includes/class-dewey-engine.php:54
+msgid "I couldn't find a strong match in your current archive."
+msgstr ""
+
+#: includes/class-dewey-engine.php:92
+msgid "Archive retrieval failed."
+msgstr ""
+
+#: includes/class-dewey-engine.php:179
+msgid "WordPress AI Client is not available on this site."
+msgstr ""
+
+#: includes/class-dewey-engine.php:184
+msgid "You are Dewey, a WordPress editorial archive assistant. Use only the provided context snippets. If context is insufficient, say so clearly. Keep answers concise and practical."
+msgstr ""
+
+#: includes/class-dewey-engine.php:225
+msgid "AI generation failed unexpectedly."
+msgstr ""
+
+#: includes/class-dewey-engine.php:245
+msgid "Unknown settings action."
+msgstr ""
+
+#: includes/class-dewey-engine.php:250
+msgid "Done. I updated your Dewey settings."
+msgstr ""
+
+#: includes/class-dewey-engine.php:281
+msgid "AI generation failed."
+msgstr ""
+
+#: includes/class-dewey-rest-controller.php:142
+msgid "Dewey index rebuild complete."
+msgstr ""
+
+#: includes/class-dewey-rest-controller.php:163
+msgid "Action canceled."
+msgstr ""
+
+#: includes/class-dewey-rest-controller.php:181
+msgid "Confirmed: full reindex complete."
+msgstr ""
+
+#: includes/class-dewey-rest-controller.php:192
+msgid "Confirmed: settings updated."
+msgstr ""
+
+#: includes/class-dewey-rest-controller.php:198
+msgid "Unknown confirm action."
+msgstr ""
+
+#: includes/class-dewey-rest-controller.php:232
+msgid "You do not have permission for this Dewey action."
+msgstr ""
+
+#: includes/class-dewey-rest-controller.php:257
+msgid "Missing REST nonce."
+msgstr ""
+
+#: includes/class-dewey-rest-controller.php:261
+msgid "Invalid REST nonce."
+msgstr ""
+
+#: includes/class-dewey-rest-controller.php:309
+msgid "Rate limit exceeded. Please wait a moment and try again."
+msgstr ""
+
+#: includes/class-dewey-rest-controller.php:352
+#: includes/class-dewey-rest-controller.php:358
+#: includes/class-dewey-rest-controller.php:363
+msgid "Invalid confirmation token."
+msgstr ""
+
+#: includes/class-dewey-rest-controller.php:367
+msgid "Confirmation token expired."
+msgstr ""
+
+#: src/components/dewey/copy.js:16
+msgid "What can you do?"
+msgstr ""
+
+#: src/components/dewey/copy.js:17
+msgid "I help your team get oriented quickly with guided prompts, workflow support, and AI connection readiness for full archive answers."
+msgstr ""
+
+#: src/components/dewey/copy.js:24
+msgid "How does this work?"
+msgstr ""
+
+#: src/components/dewey/copy.js:25
+msgid "Ask in plain language, like you would ask a teammate. In this build I provide startup guidance and connection checks while live archive answers are being finalized."
+msgstr ""
+
+#: src/components/dewey/copy.js:32
+msgid "Hello, I am Dewey. I am your in-admin editorial guide for faster decisions, clearer direction, and AI-ready archive workflows."
+msgstr ""
+
+#: src/components/dewey/copy.js:37
+msgid "I can still answer startup questions, but for full archive answers I need an AI service connected first. Open Settings -> Connectors, connect a provider, then come right back and I will take it from there."
+msgstr ""
+
+#: src/components/dewey/copy.js:42
+msgid "I am connected and ready to query your archive."
+msgstr ""
+
+#: src/components/dewey/copy.js:49
+msgid "Hey there. Need the quick tour?"
+msgstr ""
+
+#: src/components/dewey/copy.js:52
+msgid "I need an AI connection for full answers."
+msgstr ""
+
+#: src/components/dewey/copy.js:54
+msgid "Ask me about your archive."
+msgstr ""
+
+#: src/components/dewey/Dewey.jsx:13
+msgid "Ask me anything about your archive! 📚"
+msgstr ""
+
+#: src/components/dewey/Dewey.jsx:20
+msgid "Ooh let me check - I've read everything! 🔍"
+msgstr ""
+
+#: src/components/dewey/Dewey.jsx:27
+msgid "Hmm… flipping through my memory… 🤔"
+msgstr ""
+
+#: src/components/dewey/Dewey.jsx:34
+msgid "Found it! Here are your posts! ✨"
+msgstr ""
+
+#: src/components/dewey/Dewey.jsx:41
+msgid "Your archive is INCREDIBLE!! 🕺"
+msgstr ""
+
+#: src/components/dewey/Dewey.jsx:48
+msgid "Oh no… I couldn't find anything… 😢"
+msgstr ""
+
+#: src/components/dewey/Dewey.jsx:55
+msgid "Wait - you wrote THAT in 2019?! 😱"
+msgstr ""
+
+#: src/components/dewey/Dewey.jsx:62
+msgid "Hi!! I'm Dewey! I've read ALL your posts! 👋"
+msgstr ""
+
+#: src/components/dewey/Dewey.jsx:69
+msgid "That was… a lot of posts… zZz 😴"
+msgstr ""
+
+#: src/components/dewey/Dewey.jsx:476
+msgid "Dewey, your archive research assistant"
+msgstr ""
+
+#: src/components/dewey/ui/DeweyFab.jsx:59
+msgid "Close Dewey chat"
+msgstr ""
+
+#: src/components/dewey/ui/DeweyFab.jsx:60
+msgid "Open Dewey chat"
+msgstr ""
+
+#: src/components/dewey/ui/DeweyPanel.jsx:60
+#: src/components/dewey/ui/DeweyPanel.jsx:108
+msgid "Ask Dewey"
+msgstr ""
+
+#: src/components/dewey/ui/DeweyPanel.jsx:72
+msgid "AI connected"
+msgstr ""
+
+#: src/components/dewey/ui/DeweyPanel.jsx:73
+msgid "AI not connected"
+msgstr ""
+
+#: src/components/dewey/ui/DeweyPanel.jsx:79
+msgid "Close Dewey panel"
+msgstr ""
+
+#: src/components/dewey/ui/DeweyPanel.jsx:86
+msgid "Connect an AI provider in"
+msgstr ""
+
+#: src/components/dewey/ui/DeweyPanel.jsx:91
+msgid "Settings -> Connectors"
+msgstr ""
+
+#: src/components/dewey/ui/DeweyPanel.jsx:93
+msgid "to get full archive answers."
+msgstr ""
+
+#: src/components/dewey/ui/DeweyPanel.jsx:112
+msgid "Ask Dewey…"
+msgstr ""
+
+#: src/components/dewey/ui/DeweyPanel.jsx:124
+msgid "Send message"
+msgstr ""

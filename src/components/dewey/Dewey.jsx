@@ -6,66 +6,67 @@
  */
 
 import { memo, useEffect, useMemo, useRef, useState } from '@wordpress/element';
+import { __ } from '@wordpress/i18n';
 
 const STATE_CONFIG = {
 	idle: {
-		speech: 'Ask me anything about your archive! 📚',
+		speech: __( 'Ask me anything about your archive! 📚', 'dewey' ),
 		mouth: 'happy',
 		brows: 'normal',
 		particles: [ '📖' ],
 		loop: false,
 	},
 	searching: {
-		speech: "Ooh let me check - I've read everything! 🔍",
+		speech: __( "Ooh let me check - I've read everything! 🔍", 'dewey' ),
 		mouth: 'happy',
 		brows: 'normal',
 		particles: [ '🔍', '📄', '📝' ],
 		loop: false,
 	},
 	thinking: {
-		speech: 'Hmm... flipping through my memory... 🤔',
+		speech: __( 'Hmm… flipping through my memory… 🤔', 'dewey' ),
 		mouth: 'happy',
 		brows: 'thinking',
 		particles: [ '💭', '📖' ],
 		loop: false,
 	},
 	found: {
-		speech: 'Found it! Here are your posts! ✨',
+		speech: __( 'Found it! Here are your posts! ✨', 'dewey' ),
 		mouth: 'happy',
 		brows: 'normal',
 		particles: [ '✨', '⭐', '💡', '🎉' ],
 		loop: true,
 	},
 	dancing: {
-		speech: 'Your archive is INCREDIBLE!! 🕺',
+		speech: __( 'Your archive is INCREDIBLE!! 🕺', 'dewey' ),
 		mouth: 'happy',
 		brows: 'normal',
 		particles: [ '🎉', '🎊', '⭐', '✨', '🎈' ],
 		loop: true,
 	},
 	sad: {
-		speech: "Oh no... I couldn't find anything... 😢",
+		speech: __( "Oh no… I couldn't find anything… 😢", 'dewey' ),
 		mouth: 'sad',
 		brows: 'sad',
 		particles: [ '💧' ],
 		loop: false,
 	},
 	shocked: {
-		speech: 'Wait - you wrote THAT in 2019?! 😱',
+		speech: __( 'Wait - you wrote THAT in 2019?! 😱', 'dewey' ),
 		mouth: 'shocked',
 		brows: 'shocked',
 		particles: [ '😱', '❗' ],
 		loop: false,
 	},
 	hello: {
-		speech: "Hi!! I'm Dewey! I've read ALL your posts! 👋",
+		speech: __( "Hi!! I'm Dewey! I've read ALL your posts! 👋", 'dewey' ),
 		mouth: 'happy',
 		brows: 'normal',
 		particles: [ '👋', '🌟', '📚', '✨' ],
 		loop: true,
 	},
 	tired: {
-		speech: 'That was... a lot of posts... zZz 😴',
+		speech: __( 'That was… a lot of posts… zZz 😴', 'dewey' ),
 		mouth: 'happy',
 		brows: 'sad',
 		particles: [ '💤', '😴' ],
@@ -281,6 +282,39 @@ function prefersReducedMotion() {
 	return window.matchMedia( '(prefers-reduced-motion: reduce)' ).matches;
 }
 
+function usePrefersReducedMotion() {
+	const [ isReduced, setIsReduced ] = useState( () =>
+		prefersReducedMotion()
+	);
+
+	useEffect( () => {
+		if (
+			typeof window === 'undefined' ||
+			typeof window.matchMedia !== 'function'
+		) {
+			return undefined;
+		}
+
+		const media = window.matchMedia( '(prefers-reduced-motion: reduce)' );
+		const onChange = () => setIsReduced( media.matches );
+		onChange();
+
+		if ( typeof media.addEventListener === 'function' ) {
+			media.addEventListener( 'change', onChange );
+			return () => media.removeEventListener( 'change', onChange );
+		}
+
+		if ( typeof media.addListener === 'function' ) {
+			media.addListener( onChange );
+			return () => media.removeListener( onChange );
+		}
+
+		return undefined;
+	}, [] );
+
+	return isReduced;
+}
+
 const Particle = memo( function Particle( { emoji, style } ) {
 	return (
 		<div className="dewey-particle" style={ style }>
@@ -299,22 +333,18 @@ function Dewey( {
 	speech,
 } ) {
 	const [ particles, setParticles ] = useState( [] );
-	const [ currentSpeech, setCurrentSpeech ] = useState(
-		STATE_CONFIG[ state ]?.speech ?? STATE_CONFIG.idle.speech
-	);
 	const particleIntervalRef = useRef( null );
 	const particleCleanupRef = useRef( null );
 	const particleIdRef = useRef( 0 );
-	const reducedMotion = useMemo( () => prefersReducedMotion(), [] );
+	const reducedMotion = usePrefersReducedMotion();
 
 	const safeState = STATE_CONFIG[ state ] ? state : 'idle';
 	const config = STATE_CONFIG[ safeState ];
+	const currentSpeech = speech ?? config.speech;
 
 	useEffect( () => {
-		const nextSpeech = speech ?? config.speech;
-		setCurrentSpeech( nextSpeech );
-		onSpeechChange?.( nextSpeech );
-	}, [ config.speech, onSpeechChange, safeState, speech ] );
+		onSpeechChange?.( currentSpeech );
+	}, [ currentSpeech, onSpeechChange ] );
 
 	useEffect( () => {
 		if ( particleIntervalRef.current ) {
@@ -326,7 +356,7 @@ function Dewey( {
 			particleCleanupRef.current = null;
 		}
 
-		setParticles( [] );
+		setParticles( ( prev ) => ( prev.length > 0 ? [] : prev ) );
 
 		if (
 			! showParticles ||
@@ -363,11 +393,13 @@ function Dewey( {
 
 			setParticles( ( prev ) => [ ...prev, ...newParticles ] );
 
+			if ( particleCleanupRef.current ) {
+				clearTimeout( particleCleanupRef.current );
+			}
 			particleCleanupRef.current = setTimeout( () => {
+				const now = Date.now();
 				setParticles( ( prev ) =>
-					prev.filter(
-						( particle ) => particle.removeAt > Date.now()
-					)
+					prev.filter( ( particle ) => particle.removeAt > now )
 				);
 			}, 2000 );
 		};
@@ -441,7 +473,10 @@ function Dewey( {
 					viewBox="0 0 170 190"
 					xmlns="http://www.w3.org/2000/svg"
 					style={ svgStyle }
-					aria-label="Dewey, your archive research assistant"
+					aria-label={ __(
+						'Dewey, your archive research assistant',
+						'dewey'
+					) }
 					role="img"
 				>
 					<defs>
