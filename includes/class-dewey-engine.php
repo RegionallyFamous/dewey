@@ -688,7 +688,7 @@ final class Dewey_Engine {
 			$history_lines = array();
 			foreach ( $history as $turn ) {
 				$role  = 'user' === ( $turn['role'] ?? '' ) ? 'User' : 'Dewey';
-				$text  = mb_substr( trim( (string) ( $turn['text'] ?? '' ) ), 0, 500 );
+				$text  = self::safe_substr( trim( (string) ( $turn['text'] ?? '' ) ), 500 );
 				if ( '' !== $text ) {
 					$history_lines[] = $role . ': ' . $text;
 				}

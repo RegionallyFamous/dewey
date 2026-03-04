@@ -457,7 +457,9 @@ add_action(
 	static function ( int $post_id ) {
 		$post = get_post( $post_id );
 		if ( $post instanceof WP_Post ) {
-			dewey_maybe_schedule_reindex( $post_id, $post );
+			// Deletions should always trigger index cleanup, even if current status
+			// is no longer in the indexed allowlist.
+			dewey_maybe_schedule_reindex( $post_id, $post, false );
 		}
 	}
 );

@@ -412,7 +412,7 @@ final class Dewey_REST_Controller {
 			}
 			$text = wp_strip_all_tags( (string) ( $item['text'] ?? '' ) );
 			$text = preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', (string) $text );
-			$text = mb_substr( trim( (string) $text ), 0, 500 );
+			$text = self::safe_substr( trim( (string) $text ), 500 );
 			if ( '' === $text ) {
 				continue;
 			}
@@ -434,7 +434,7 @@ final class Dewey_REST_Controller {
 	 */
 	public static function sanitize_page_context( $context ): string {
 		$value = sanitize_key( (string) $context );
-		return mb_substr( $value, 0, 80 );
+		return self::safe_substr( $value, 80 );
 	}
 
 	/**
