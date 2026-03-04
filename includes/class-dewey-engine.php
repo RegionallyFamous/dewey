@@ -49,17 +49,6 @@ final class Dewey_Engine {
 			return $retrieval;
 		}
 
-		if ( empty( $retrieval['citations'] ) ) {
-			return array(
-				'answer'    => __( "I couldn't find a strong match in your current archive.", 'dewey' ),
-				'citations' => array(),
-				'meta'      => array(
-					'retrieval_mode' => $retrieval['retrieval_mode'],
-					'result_count'   => 0,
-				),
-			);
-		}
-
 		$answer_result = self::generate_answer( $question, $retrieval['context_blocks'] );
 		if ( is_wp_error( $answer_result ) ) {
 			return $answer_result;
@@ -181,16 +170,26 @@ final class Dewey_Engine {
 			);
 		}
 
-		$system_instruction = __(
-			'You are Dewey, a WordPress editorial archive assistant. Use only the provided context snippets. If context is insufficient, say so clearly. Keep answers concise and practical.',
-			'dewey'
-		);
-		$context_payload = implode( "\n\n", $context_blocks );
-		$user_prompt     = sprintf(
-			"Question: %s\n\nContext:\n%s\n\nWrite a helpful answer with references to source IDs like [123].",
-			$question,
-			$context_payload
-		);
+		$has_context = ! empty( $context_blocks );
+
+		if ( $has_context ) {
+			$system_instruction = __(
+				"You are Dewey — a sharp, friendly WordPress admin assistant living inside the dashboard. You have access to this site's archive. Use the provided content snippets to answer. Be conversational and direct. Cite sources inline as [post_id]. No fluff.",
+				'dewey'
+			);
+			$context_payload = implode( "\n\n", $context_blocks );
+			$user_prompt     = sprintf(
+				"Question: %s\n\nArchive context:\n%s\n\nAnswer conversationally. Reference source IDs like [123] inline.",
+				$question,
+				$context_payload
+			);
+		} else {
+			$system_instruction = __(
+				'You are Dewey — a sharp, friendly WordPress admin assistant living inside the dashboard. Answer from your general knowledge. Be conversational, practical, and concise. You know WordPress deeply. No fluff, no disclaimers.',
+				'dewey'
+			);
+			$user_prompt = $question;
+		}
 
 		try {
 			$prompt = wp_ai_client_prompt( $user_prompt );

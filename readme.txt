@@ -4,7 +4,7 @@ Tags: ai, content search, admin assistant, writing assistant, knowledge base
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 1.0.14
+Stable tag: 1.0.15
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -44,6 +44,11 @@ No. Dewey retrieves relevant excerpts first and sends only the minimum context n
 Dewey runs in wp-admin for authenticated users with appropriate capabilities. Query/status routes are for editors, while maintenance actions like reindex are admin-only.
 
 == Changelog ==
+
+= 1.0.15 =
+* Dewey now always answers — archive search enriches responses when content matches, AI general knowledge fills in when it doesn't.
+* Added dual-mode AI prompts with a consistent Dewey personality voice.
+* Rewrote all static UI copy to match the conversational tone.
 
 = 1.0.14 =
 * Remove hardcoded model preferences — AI provider now picks the best available model automatically.

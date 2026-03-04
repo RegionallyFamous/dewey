@@ -8,7 +8,7 @@ If you discover a vulnerability, report it privately to the maintainer before pu
 
 - Include affected version, attack path, proof of concept, and impact.
 
-## Current Security Controls (v1.0.14)
+## Current Security Controls (v1.0.15)
 
 - Direct access guards in PHP files (`defined( 'ABSPATH' ) || exit;`).
 - Strict settings sanitization/allowlisting in `Dewey_Settings`.

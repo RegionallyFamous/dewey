@@ -15,7 +15,7 @@ export const STARTER_ACTIONS = [
 		id: 'what-can-you-do',
 		label: __( 'What can you do?', 'dewey' ),
 		reply: __(
-			'I help your team get oriented quickly with guided prompts, workflow support, and AI connection readiness for full archive answers.',
+			"Good question. I can search your archive and pull up anything you need — posts, pages, content patterns. I can also answer general WordPress questions, help you think through editorial decisions, and act on settings when you ask. Just talk to me like a teammate.",
 			'dewey'
 		),
 	},
@@ -23,33 +23,33 @@ export const STARTER_ACTIONS = [
 		id: 'how-does-this-work',
 		label: __( 'How does this work?', 'dewey' ),
 		reply: __(
-			'Ask in plain language, like you would ask a teammate. In this build I provide startup guidance and connection checks while live archive answers are being finalized.',
+			"Type anything. If it's in your archive, I'll find it and give you a real answer with sources. If it's not, I'll use my own knowledge. Either way, you get an answer — not a search results page.",
 			'dewey'
 		),
 	},
 ];
 
 export const FIRST_OPEN_MESSAGE = __(
-	'Hello, I am Dewey. I am your in-admin editorial guide for faster decisions, clearer direction, and AI-ready archive workflows.',
+	"Hey, I'm Dewey. Ask me anything about your site or WordPress — I'll search your archive or answer from my own knowledge.",
 	'dewey'
 );
 
 export const NO_AI_MESSAGE = __(
-	'I can still answer startup questions, but for full archive answers I need an AI service connected first. Open Settings -> Connectors, connect a provider, then come right back and I will take it from there.',
+	"I need an AI provider connected to answer that. Head to Settings → Connectors, add a key, then come back — I'll be ready.",
 	'dewey'
 );
 
 export const CONNECTED_PLACEHOLDER_MESSAGE = __(
-	'I am connected and ready to query your archive.',
+	"Connected and ready. What do you need?",
 	'dewey'
 );
 
 export function getSpeechText( deweyState, isAiConnected ) {
 	if ( deweyState === 'hello' ) {
-		return __( 'Hey there. Need the quick tour?', 'dewey' );
+		return __( 'Hey — what do you need?', 'dewey' );
 	}
 	if ( deweyState === 'sad' && ! isAiConnected ) {
-		return __( 'I need an AI connection for full answers.', 'dewey' );
+		return __( 'Connect an AI provider to get started.', 'dewey' );
 	}
-	return __( 'Ask me about your archive.', 'dewey' );
+	return __( 'Ask me anything.', 'dewey' );
 }
