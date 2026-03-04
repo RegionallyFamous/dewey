@@ -4,7 +4,7 @@ Tags: ai, content search, admin assistant, writing assistant, knowledge base
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 1.0.20
+Stable tag: 1.0.21
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -47,6 +47,11 @@ No. Dewey retrieves relevant excerpts first and sends only the minimum context n
 Dewey runs in wp-admin for authenticated users with appropriate capabilities. Query/status routes are for editors, while maintenance actions like reindex are admin-only.
 
 == Changelog ==
+
+= 1.0.21 =
+* Write actions: Dewey can now create draft posts and pages, list recent content, and propose trash/publish operations — all gated by the logged-in user's WordPress capabilities. Destructive actions require explicit confirmation before executing.
+* New REST endpoint `/dewey/v1/execute-action` with HMAC-signed tokens for confirmed content changes (trash, publish).
+* Intent router extended with action patterns for create/list/trash/publish recognized before AI is consulted.
 
 = 1.0.20 =
 * Navigation command suggestions: as you type in the Dewey panel, fuzzy-matched go-to chips appear for any wp-admin screen. Powered by Fuse.js client-side matching against a 40-command registry and dynamically scraped sidebar items. Works without an AI provider connected.

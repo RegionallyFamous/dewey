@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "description": "Replay fixtures for Dewey retrieval behavior checks.",
+  "cases": [
+    {
+      "id": "find-onboarding-posts",
+      "question": "What have we published about onboarding?",
+      "intent": "archive_lookup"
+    },
+    {
+      "id": "find-recent-security",
+      "question": "Show me recent posts about WordPress security from 2025",
+      "intent": "archive_lookup_date_biased"
+    },
+    {
+      "id": "title-lookup",
+      "question": "Do we have a post called Hello World?",
+      "intent": "archive_lookup_title"
+    }
+  ]
+}

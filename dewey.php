@@ -3,7 +3,7 @@
  * Plugin Name: Dewey AI Search Assistant
  * Plugin URI: https://github.com/regionally-famous/dewey
  * Description: Dewey brings live archive query and AI answers into wp-admin, with citations and built-in guardrails powered by WordPress 7.0 core capabilities.
- * Version: 1.0.20
+ * Version: 1.0.21
  * Requires at least: 7.0
  * Requires PHP: 8.1
  * Author: Regionally Famous
@@ -18,13 +18,14 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'DEWEY_VERSION', '1.0.20' );
+define( 'DEWEY_VERSION', '1.0.21' );
 define( 'DEWEY_PLUGIN_FILE', __FILE__ );
 define( 'DEWEY_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DEWEY_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
 require_once DEWEY_PLUGIN_DIR . 'includes/class-dewey-settings.php';
 require_once DEWEY_PLUGIN_DIR . 'includes/class-dewey-intent-router.php';
+require_once DEWEY_PLUGIN_DIR . 'includes/class-dewey-action-handler.php';
 require_once DEWEY_PLUGIN_DIR . 'includes/class-dewey-indexer.php';
 require_once DEWEY_PLUGIN_DIR . 'includes/class-dewey-engine.php';
 require_once DEWEY_PLUGIN_DIR . 'includes/class-dewey-rest-controller.php';
@@ -194,6 +195,7 @@ function dewey_enqueue_admin_assets( string $hook_suffix ) {
 				'debugEnabled'  => current_user_can( 'manage_options' ),
 				'citationStyle' => (string) ( Dewey_Settings::get_all()['citation_style'] ?? 'titles' ),
 				'currentUser'   => sanitize_text_field( (string) ( $current_user->display_name ?? '' ) ),
+				'screenContext' => dewey_build_admin_screen_context(),
 			)
 		) . ';',
 		'before'
@@ -201,6 +203,130 @@ function dewey_enqueue_admin_assets( string $hook_suffix ) {
 }
 add_action( 'admin_enqueue_scripts', 'dewey_enqueue_admin_assets' );
 add_action( 'rest_api_init', array( 'Dewey_REST_Controller', 'register_routes' ) );
+
+/**
+ * Build normalized wp-admin screen context for Dewey.
+ *
+ * This context is passed to the frontend and then to the REST query payload so
+ * Dewey can reason about the current screen with structured signals.
+ *
+ * @return array<string,mixed>
+ */
+function dewey_build_admin_screen_context(): array {
+	$context = array(
+		'id'          => '',
+		'base'        => '',
+		'parent_base' => '',
+		'post_type'   => '',
+		'taxonomy'    => '',
+		'title'       => '',
+		'capabilities' => array(
+			'edit_posts'     => current_user_can( 'edit_posts' ),
+			'manage_options' => current_user_can( 'manage_options' ),
+			'list_users'     => current_user_can( 'list_users' ),
+		),
+		'stats'       => array(),
+	);
+
+	if ( ! function_exists( 'get_current_screen' ) ) {
+		return $context;
+	}
+
+	$screen = get_current_screen();
+	if ( ! class_exists( 'WP_Screen' ) || ! $screen instanceof WP_Screen ) {
+		return $context;
+	}
+
+	$context['id']          = sanitize_key( (string) $screen->id );
+	$context['base']        = sanitize_key( (string) $screen->base );
+	$context['parent_base'] = sanitize_key( (string) $screen->parent_base );
+	$context['post_type']   = sanitize_key( (string) $screen->post_type );
+	$context['taxonomy']    = sanitize_key( (string) $screen->taxonomy );
+
+	if ( function_exists( 'get_admin_page_title' ) ) {
+		$context['title'] = sanitize_text_field( (string) get_admin_page_title() );
+	}
+
+	$base = (string) $context['base'];
+	if ( 0 === strpos( $base, 'settings_page' ) ) {
+		$context['stats'] = array(
+			'site_title'       => sanitize_text_field( (string) get_option( 'blogname', '' ) ),
+			'timezone'         => sanitize_text_field( (string) get_option( 'timezone_string', '' ) ),
+			'posts_per_page'   => (int) get_option( 'posts_per_page', 10 ),
+			'default_category' => (int) get_option( 'default_category', 0 ),
+		);
+		return $context;
+	}
+
+	switch ( $base ) {
+		case 'dashboard':
+			$post_counts = wp_count_posts( 'post' );
+			$context['stats'] = array(
+				'published_posts' => isset( $post_counts->publish ) ? (int) $post_counts->publish : 0,
+			);
+			break;
+
+		case 'plugins':
+			if ( function_exists( 'get_plugins' ) ) {
+				$plugins        = get_plugins();
+				$active_plugins = (array) get_option( 'active_plugins', array() );
+				$context['stats'] = array(
+					'total_plugins'  => count( $plugins ),
+					'active_plugins' => count( $active_plugins ),
+				);
+			}
+			break;
+
+		case 'themes':
+			if ( function_exists( 'wp_get_themes' ) ) {
+				$themes = wp_get_themes();
+				$active = wp_get_theme();
+				$context['stats'] = array(
+					'total_themes' => is_array( $themes ) ? count( $themes ) : 0,
+					'active_theme' => sanitize_text_field( (string) $active->get( 'Name' ) ),
+				);
+			}
+			break;
+
+		case 'users':
+			if ( function_exists( 'count_users' ) ) {
+				$users = count_users();
+				$total = is_array( $users ) ? (int) ( $users['total_users'] ?? 0 ) : 0;
+				$context['stats'] = array(
+					'total_users' => $total,
+				);
+			}
+			break;
+
+		case 'upload':
+			$attachment_counts = wp_count_posts( 'attachment' );
+			$context['stats']  = array(
+				'media_items' => isset( $attachment_counts->inherit ) ? (int) $attachment_counts->inherit : 0,
+			);
+			break;
+
+		case 'edit':
+		case 'post':
+			$post_type = '' !== $context['post_type'] ? $context['post_type'] : 'post';
+			$counts    = wp_count_posts( $post_type );
+			$context['stats'] = array(
+				'published' => isset( $counts->publish ) ? (int) $counts->publish : 0,
+				'draft'     => isset( $counts->draft ) ? (int) $counts->draft : 0,
+			);
+			break;
+
+		case 'options-general':
+			$context['stats'] = array(
+				'site_title'       => sanitize_text_field( (string) get_option( 'blogname', '' ) ),
+				'timezone'         => sanitize_text_field( (string) get_option( 'timezone_string', '' ) ),
+				'posts_per_page'   => (int) get_option( 'posts_per_page', 10 ),
+				'default_category' => (int) get_option( 'default_category', 0 ),
+			);
+			break;
+	}
+
+	return $context;
+}
 
 /**
  * Get the wp-admin URL for the Connectors screen.

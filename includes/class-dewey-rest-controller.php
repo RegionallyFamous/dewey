@@ -55,6 +55,12 @@ final class Dewey_REST_Controller {
 					'default'           => 0,
 					'sanitize_callback' => 'absint',
 				),
+				'screen_context' => array(
+					'type'              => 'object',
+					'required'          => false,
+					'default'           => array(),
+					'sanitize_callback' => array( __CLASS__, 'sanitize_screen_context' ),
+				),
 			),
 			)
 		);
@@ -82,6 +88,27 @@ final class Dewey_REST_Controller {
 				'methods'             => WP_REST_Server::CREATABLE,
 				'permission_callback' => array( __CLASS__, 'can_reindex' ),
 				'callback'            => array( __CLASS__, 'reindex' ),
+			)
+		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/execute-action',
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'permission_callback' => array( __CLASS__, 'can_query' ),
+				'callback'            => array( __CLASS__, 'execute_action' ),
+				'args'                => array(
+					'token'    => array(
+						'type'              => 'string',
+						'required'          => true,
+						'sanitize_callback' => 'sanitize_text_field',
+					),
+					'approved' => array(
+						'type'    => 'boolean',
+						'default' => true,
+					),
+				),
 			)
 		);
 
@@ -123,7 +150,9 @@ final class Dewey_REST_Controller {
 		$history          = is_array( $history ) ? $history : array();
 		$page_context     = (string) $request->get_param( 'page_context' );
 		$post_id          = (int) $request->get_param( 'post_id' );
-		$result           = Dewey_Engine::answer_question( $question, $assistant_prompt, $history, $page_context, $post_id );
+		$screen_context   = $request->get_param( 'screen_context' );
+		$screen_context   = is_array( $screen_context ) ? $screen_context : array();
+		$result           = Dewey_Engine::answer_question( $question, $assistant_prompt, $history, $page_context, $post_id, $screen_context );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
@@ -160,6 +189,7 @@ final class Dewey_REST_Controller {
 				'status'         => true,
 				'reindex'        => current_user_can( 'manage_options' ),
 				'confirm_action' => current_user_can( 'manage_options' ),
+				'execute_action' => current_user_can( 'edit_posts' ),
 			),
 		);
 
@@ -188,6 +218,80 @@ final class Dewey_REST_Controller {
 				'index'   => $status,
 			)
 		);
+	}
+
+	/**
+	 * Execute a confirmed content action (trash, publish) from a signed token.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function execute_action( WP_REST_Request $request ) {
+		$rate = self::enforce_rate_limit( 'execute_action' );
+		if ( is_wp_error( $rate ) ) {
+			return $rate;
+		}
+
+		$approved = (bool) $request->get_param( 'approved' );
+		if ( ! $approved ) {
+			return rest_ensure_response(
+				array(
+					'ok'      => true,
+					'message' => __( 'Action canceled.', 'dewey' ),
+				)
+			);
+		}
+
+		$token_data = self::verify_action_token( (string) $request->get_param( 'token' ) );
+		if ( is_wp_error( $token_data ) ) {
+			return $token_data;
+		}
+
+		$action_type = (string) ( $token_data['action_type'] ?? '' );
+		$params      = is_array( $token_data['params'] ?? null ) ? $token_data['params'] : array();
+
+		switch ( $action_type ) {
+			case 'trash_post':
+				$result = Dewey_Action_Handler::trash_post( $params );
+				if ( is_wp_error( $result ) ) {
+					return $result;
+				}
+				return rest_ensure_response(
+					array(
+						'ok'      => true,
+						'message' => sprintf(
+							/* translators: %s: post title */
+							__( 'Moved "%s" to trash.', 'dewey' ),
+							(string) ( $result['title'] ?? '' )
+						),
+						'result'  => $result,
+					)
+				);
+
+			case 'publish_post':
+				$result = Dewey_Action_Handler::publish_post( $params );
+				if ( is_wp_error( $result ) ) {
+					return $result;
+				}
+				return rest_ensure_response(
+					array(
+						'ok'      => true,
+						'message' => sprintf(
+							/* translators: %s: post title */
+							__( 'Published "%s" successfully.', 'dewey' ),
+							(string) ( $result['title'] ?? '' )
+						),
+						'result'  => $result,
+					)
+				);
+
+			default:
+				return new WP_Error(
+					'dewey_unknown_action',
+					__( 'Unknown action type.', 'dewey' ),
+					array( 'status' => 400 )
+				);
+		}
 	}
 
 	/**
@@ -326,6 +430,7 @@ final class Dewey_REST_Controller {
 				'status'         => 60,
 				'reindex'        => 5,
 				'confirm_action' => 10,
+				'execute_action' => 15,
 			)
 		);
 		$limit  = absint( $limits[ $route ] ?? 20 );
@@ -440,6 +545,107 @@ final class Dewey_REST_Controller {
 	public static function sanitize_page_context( $context ): string {
 		$value = sanitize_key( (string) $context );
 		return self::safe_substr( $value, 80 );
+	}
+
+	/**
+	 * Sanitize structured screen context sent from frontend.
+	 *
+	 * @param mixed $context
+	 * @return array<string,mixed>
+	 */
+	public static function sanitize_screen_context( $context ): array {
+		if ( ! is_array( $context ) ) {
+			return array();
+		}
+
+		$sanitized = array(
+			'id'          => self::safe_substr( sanitize_key( (string) ( $context['id'] ?? '' ) ), 80 ),
+			'base'        => self::safe_substr( sanitize_key( (string) ( $context['base'] ?? '' ) ), 80 ),
+			'parent_base' => self::safe_substr( sanitize_key( (string) ( $context['parent_base'] ?? '' ) ), 80 ),
+			'post_type'   => self::safe_substr( sanitize_key( (string) ( $context['post_type'] ?? '' ) ), 60 ),
+			'taxonomy'    => self::safe_substr( sanitize_key( (string) ( $context['taxonomy'] ?? '' ) ), 60 ),
+			'title'       => self::safe_substr( sanitize_text_field( (string) ( $context['title'] ?? '' ) ), 120 ),
+			'stats'       => array(),
+		);
+
+		$raw_stats = $context['stats'] ?? array();
+		if ( is_array( $raw_stats ) ) {
+			foreach ( $raw_stats as $key => $value ) {
+				$clean_key = self::safe_substr( sanitize_key( (string) $key ), 40 );
+				if ( '' === $clean_key ) {
+					continue;
+				}
+				if ( is_numeric( $value ) ) {
+					$sanitized['stats'][ $clean_key ] = (int) $value;
+					continue;
+				}
+				if ( is_scalar( $value ) ) {
+					$sanitized['stats'][ $clean_key ] = self::safe_substr( sanitize_text_field( (string) $value ), 80 );
+				}
+			}
+		}
+
+		return $sanitized;
+	}
+
+	/**
+	 * Sign a content action token (trash/publish). Separate from confirm tokens
+	 * because the params schema is different from settings params.
+	 *
+	 * @param string              $action_type  e.g. 'trash_post'.
+	 * @param array<string,mixed> $params       action-specific params.
+	 * @return string
+	 */
+	public static function create_action_token( string $action_type, array $params ): string {
+		$allowed_types = array( 'trash_post', 'publish_post' );
+		$action_type   = in_array( $action_type, $allowed_types, true ) ? $action_type : '';
+
+		$clean_params = array();
+		if ( isset( $params['post_id'] ) ) {
+			$clean_params['post_id'] = absint( $params['post_id'] );
+		}
+		if ( isset( $params['post_title'] ) ) {
+			$clean_params['post_title'] = sanitize_text_field( (string) $params['post_title'] );
+		}
+
+		$payload = array(
+			'action_type' => $action_type,
+			'params'      => $clean_params,
+			'expires'     => time() + self::TOKEN_TTL,
+		);
+		$json    = wp_json_encode( $payload );
+		$encoded = rawurlencode( (string) $json );
+		$sig     = hash_hmac( 'sha256', $encoded, wp_salt( 'auth' ) );
+
+		return $encoded . '.' . $sig;
+	}
+
+	/**
+	 * @param string $token
+	 * @return array<string,mixed>|WP_Error
+	 */
+	private static function verify_action_token( string $token ) {
+		$parts = explode( '.', $token, 2 );
+		if ( 2 !== count( $parts ) ) {
+			return new WP_Error( 'dewey_bad_token', __( 'Invalid action token.', 'dewey' ), array( 'status' => 400 ) );
+		}
+
+		list( $encoded, $sig ) = $parts;
+		$expected = hash_hmac( 'sha256', $encoded, wp_salt( 'auth' ) );
+		if ( ! hash_equals( $expected, $sig ) ) {
+			return new WP_Error( 'dewey_bad_token', __( 'Invalid action token.', 'dewey' ), array( 'status' => 400 ) );
+		}
+
+		$decoded = json_decode( rawurldecode( $encoded ), true );
+		if ( ! is_array( $decoded ) ) {
+			return new WP_Error( 'dewey_bad_token', __( 'Invalid action token.', 'dewey' ), array( 'status' => 400 ) );
+		}
+
+		if ( absint( $decoded['expires'] ?? 0 ) < time() ) {
+			return new WP_Error( 'dewey_token_expired', __( 'Action token expired.', 'dewey' ), array( 'status' => 400 ) );
+		}
+
+		return $decoded;
 	}
 
 	/**

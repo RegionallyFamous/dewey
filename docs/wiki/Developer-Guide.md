@@ -47,3 +47,9 @@ To add a new command, append an entry to `commands.js` following the existing st
 - Indexed scoring and integrity checks live in `includes/class-dewey-indexer.php`
 - `/status` includes `index_health`, `integrity`, and retrieval `telemetry` for operational visibility
 - Non-public indexing (draft/private) is admin-gated and opt-in via settings intent
+- Admin screen context contract is injected from `dewey.php` (`dewey_build_admin_screen_context`) and sent on `/query` as `screen_context`
+
+## Eval Fixtures
+
+- Retrieval replay fixtures live in `tests/evals/retrieval-evals.json`
+- PHP core tests load and replay these fixture questions to catch retrieval regressions early

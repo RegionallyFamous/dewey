@@ -10,11 +10,14 @@ The current repository ships:
 - **navigation command suggestions**: Fuse.js fuzzy matching against a 40-command registry plus dynamically scraped `#adminmenu` items; live chips appear as the user types, working with or without an AI provider
 - BM25-style indexed retrieval with AI-powered query expansion and automatic re-indexing via WP-Cron
 - retrieval fallback pipeline for low-signal queries (title-first fallback, date-aware ranking, no-hit refinement prompts)
+- structured admin screen context pipeline (`screenContext`) passed frontend -> REST -> engine for screen-aware answers
+- screen adapter context blocks for dashboard/plugins/themes/users/media/settings/editor screens
 - multi-turn conversation history sent with every query (last 10 turns)
 - AI answer generation pipeline with tone, verbosity, and citation style settings
 - site stats grounding (post count, last published date, top categories) in every system instruction
 - Dewey REST engine routes (`query`, `status`, `reindex`, `confirm-action`) with capability and rate-limit guardrails
 - index health observability via `/status` (staleness warning, integrity report auto-heal, retrieval telemetry counters)
+- replayable retrieval eval fixtures in `tests/evals/retrieval-evals.json` validated during PHP core tests
 - settings sanitization, intent routing, and settings-change confirmation in Dewey's voice
 - copy-to-clipboard, retry on error, relative timestamps, and Alt+Shift+D keyboard shortcut
 

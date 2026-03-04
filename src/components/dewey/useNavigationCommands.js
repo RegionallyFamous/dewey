@@ -27,6 +27,11 @@ const MIN_CHARS = 3;
 const DEBOUNCE_MS = 280;
 const MAX_SUGGESTIONS = 3;
 
+// Stricter threshold used only at submit time — must be a near-certain
+// navigation match to short-circuit the AI query.
+const NAV_INTERCEPT_THRESHOLD = 0.22;
+const NAV_INTERCEPT_MAX_WORDS = 8;
+
 function isSafeAdminUrl( url ) {
 	if ( ! url || typeof url !== 'string' ) {
 		return false;
@@ -144,5 +149,41 @@ export function useNavigationCommands( input ) {
 			: base + command.url;
 	}, [] );
 
-	return { suggestions, navigate };
+	/**
+	 * Synchronous check used at submit time. Returns the top command only
+	 * when the match is high-confidence and the query looks like a navigation
+	 * request rather than a content question (no "?", short word count).
+	 *
+	 * @param {string} query Raw input value at the moment of form submission.
+	 * @return {Object|null} Matched command, or null to let the AI handle it.
+	 */
+	const getTopNavMatch = useCallback( ( query ) => {
+		if ( ! fuseRef.current ) {
+			return null;
+		}
+
+		const trimmed = ( query || '' ).trim();
+
+		if (
+			trimmed.length < MIN_CHARS ||
+			trimmed.includes( '?' ) ||
+			trimmed.split( /\s+/ ).length > NAV_INTERCEPT_MAX_WORDS
+		) {
+			return null;
+		}
+
+		const results = fuseRef.current.search( trimmed, { limit: 1 } );
+
+		if (
+			! results.length ||
+			! results[ 0 ].item.url ||
+			results[ 0 ].score > NAV_INTERCEPT_THRESHOLD
+		) {
+			return null;
+		}
+
+		return results[ 0 ].item;
+	}, [] );
+
+	return { suggestions, navigate, getTopNavMatch };
 }

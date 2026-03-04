@@ -96,6 +96,8 @@ final class Dewey_Indexer {
 					'snippet'    => $snippet,
 					'tags_text'  => $tags_text,
 					'cats_text'  => $cats_text,
+					'post_type'  => (string) $post->post_type,
+					'post_status' => (string) $post->post_status,
 					'word_count' => $word_count,
 					'modified'   => get_post_modified_time( 'c', true, $post ),
 				);

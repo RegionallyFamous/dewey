@@ -178,6 +178,10 @@ describe( 'useDeweyChat', () => {
 			aiConnected: true,
 			restBase: 'https://example.com/wp-json/dewey/v1',
 			nonce: 'valid-nonce',
+			screenContext: {
+				base: 'edit',
+				post_type: 'post',
+			},
 		};
 		window.fetch = jest.fn().mockResolvedValue( {
 			ok: true,
@@ -228,6 +232,12 @@ describe( 'useDeweyChat', () => {
 		);
 		expect( requestPayload.assistant_system_prompt ).toBe(
 			DEWEY_SOUL_SYSTEM_PROMPT
+		);
+		expect( requestPayload.screen_context ).toEqual(
+			expect.objectContaining( {
+				base: 'edit',
+				post_type: 'post',
+			} )
 		);
 		const lastMessage =
 			result.current.messages[ result.current.messages.length - 1 ];

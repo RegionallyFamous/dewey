@@ -8,7 +8,7 @@ If you discover a vulnerability, report it privately to the maintainer before pu
 
 - Include affected version, attack path, proof of concept, and impact.
 
-## Current Security Controls (v1.0.20)
+## Current Security Controls (v1.0.21)
 
 - Direct access guards in PHP files (`defined( 'ABSPATH' ) || exit;`).
 - Strict settings sanitization/allowlisting in `Dewey_Settings`.
@@ -19,7 +19,10 @@ If you discover a vulnerability, report it privately to the maintainer before pu
 - Frontend submit throttling and bounded in-memory chat history.
 - Assistant system prompt sanitization at REST boundary before AI generation.
 - Admin-gated non-public indexing mode (draft/private indexing requires explicit opt-in).
-- REST route capability and nonce checks for query/status/reindex/confirm-action.
+- REST route capability and nonce checks for query/status/reindex/confirm-action/execute-action.
+- Content write actions (`Dewey_Action_Handler`) enforce per-action `current_user_can()` checks; Dewey can never perform an action the logged-in user cannot perform themselves.
+- Destructive actions (trash, publish) are gated behind HMAC-signed, TTL-limited tokens verified by `verify_action_token()` before any database mutation.
+- Created posts are always saved as drafts; publishing requires an explicit second confirmation step.
 - Per-route, per-user server-side rate limiting with 429 responses.
 - Index integrity checks with automatic orphan-entry cleanup and capped integrity reports.
 - Build/release preflight checks (lint, tests, docs consistency, security scan).

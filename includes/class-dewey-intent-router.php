@@ -13,6 +13,119 @@ defined( 'ABSPATH' ) || exit;
 final class Dewey_Intent_Router {
 
 	/**
+	 * Action intent rules checked before settings rules.
+	 *
+	 * Each rule returns type:'action' with action_type, optional capture fields,
+	 * and whether the action needs user confirmation.
+	 *
+	 * @var array<int,array{
+	 *   pattern:string,
+	 *   action_type:string,
+	 *   post_type:string,
+	 *   status:string,
+	 *   requires_confirm:bool,
+	 *   confidence:float
+	 * }>
+	 */
+	private const ACTION_RULES = array(
+		// Create post ---------------------------------------------------------
+		array(
+			'pattern'          => '/\b(?:create|write|draft|start|add)\b.{0,20}\b(?:post|article|blog\s*post)\b.{0,60}\b(?:about|called|titled|named|on)\b\s+(.+)/i',
+			'action_type'      => 'create_post',
+			'post_type'        => 'post',
+			'status'           => '',
+			'requires_confirm' => false,
+			'confidence'       => 0.92,
+		),
+		array(
+			'pattern'          => '/\b(?:create|write|draft|start|add)\b\s+(?:a\s+)?(?:new\s+)?(?:post|article|blog\s*post)\b(.+)?/i',
+			'action_type'      => 'create_post',
+			'post_type'        => 'post',
+			'status'           => '',
+			'requires_confirm' => false,
+			'confidence'       => 0.88,
+		),
+		// Create page ---------------------------------------------------------
+		array(
+			'pattern'          => '/\b(?:create|add|make|start)\b.{0,20}\bpage\b.{0,60}\b(?:about|called|titled|named|for)\b\s+(.+)/i',
+			'action_type'      => 'create_post',
+			'post_type'        => 'page',
+			'status'           => '',
+			'requires_confirm' => false,
+			'confidence'       => 0.92,
+		),
+		array(
+			'pattern'          => '/\b(?:create|add|make|start)\b\s+(?:a\s+)?(?:new\s+)?page\b(.+)?/i',
+			'action_type'      => 'create_post',
+			'post_type'        => 'page',
+			'status'           => '',
+			'requires_confirm' => false,
+			'confidence'       => 0.88,
+		),
+		// List drafts ---------------------------------------------------------
+		array(
+			'pattern'          => '/\b(?:show|list|view|find|see)\b.{0,20}\b(?:my\s+)?(?:all\s+|recent\s+|latest\s+)?drafts?\b/i',
+			'action_type'      => 'list_posts',
+			'post_type'        => 'post',
+			'status'           => 'draft',
+			'requires_confirm' => false,
+			'confidence'       => 0.93,
+		),
+		// List published posts ------------------------------------------------
+		array(
+			'pattern'          => '/\b(?:show|list|view)\b.{0,20}\b(?:my\s+)?(?:all\s+|recent\s+|latest\s+)?(?:published\s+)?posts?\b/i',
+			'action_type'      => 'list_posts',
+			'post_type'        => 'post',
+			'status'           => 'publish',
+			'requires_confirm' => false,
+			'confidence'       => 0.88,
+		),
+		// List pages ----------------------------------------------------------
+		array(
+			'pattern'          => '/\b(?:show|list|view)\b.{0,20}\b(?:my\s+)?(?:all\s+|recent\s+)?pages?\b/i',
+			'action_type'      => 'list_posts',
+			'post_type'        => 'page',
+			'status'           => 'any',
+			'requires_confirm' => false,
+			'confidence'       => 0.88,
+		),
+		// Trash post ----------------------------------------------------------
+		array(
+			'pattern'          => '/\b(?:trash|delete|remove)\b.{0,20}\b(?:the\s+)?(?:post|page|article|draft)?\b.{0,40}\b(?:about|called|titled|named)\b\s+(.+)/i',
+			'action_type'      => 'trash_post',
+			'post_type'        => '',
+			'status'           => '',
+			'requires_confirm' => true,
+			'confidence'       => 0.90,
+		),
+		array(
+			'pattern'          => '/\b(?:trash|delete|remove)\b\s+(?:the\s+)?(?:post|page|article|draft)\b\s+(.+)/i',
+			'action_type'      => 'trash_post',
+			'post_type'        => '',
+			'status'           => '',
+			'requires_confirm' => true,
+			'confidence'       => 0.88,
+		),
+		// Publish post --------------------------------------------------------
+		array(
+			'pattern'          => '/\b(?:publish|go\s+live\s+with|make\s+live|release)\b.{0,20}\b(?:the\s+)?(?:post|page|article|draft)?\b.{0,40}\b(?:about|called|titled|named)\b\s+(.+)/i',
+			'action_type'      => 'publish_post',
+			'post_type'        => '',
+			'status'           => '',
+			'requires_confirm' => true,
+			'confidence'       => 0.90,
+		),
+		array(
+			'pattern'          => '/\b(?:publish|go\s+live\s+with|make\s+live|release)\b\s+(?:the\s+)?(?:post|page|article|draft)\b\s+(.+)/i',
+			'action_type'      => 'publish_post',
+			'post_type'        => '',
+			'status'           => '',
+			'requires_confirm' => true,
+			'confidence'       => 0.88,
+		),
+	);
+
+	/**
 	 * Ordered match rules, evaluated top-to-bottom.
 	 *
 	 * @var array<int,array{
@@ -151,6 +264,18 @@ final class Dewey_Intent_Router {
 	 */
 	public function route( string $question ): array {
 		$q = strtolower( trim( $question ) );
+
+		// Check action intents first — they are more specific than settings.
+		foreach ( self::ACTION_RULES as $rule ) {
+			$matched = preg_match( $rule['pattern'], $q, $matches );
+			if ( ! $matched ) {
+				continue;
+			}
+			// Capture group 1, if present, is the title/search term.
+			$capture = isset( $matches[1] ) ? trim( $matches[1] ) : '';
+			return $this->action_intent( $rule, $capture );
+		}
+
 		foreach ( self::RULES as $rule ) {
 			if ( ! preg_match( $rule['pattern'], $q ) ) {
 				continue;
@@ -167,6 +292,25 @@ final class Dewey_Intent_Router {
 		return array(
 			'type'       => 'archive',
 			'confidence' => 0.5,
+		);
+	}
+
+	/**
+	 * Build an action intent array from a matched ACTION_RULE.
+	 *
+	 * @param array  $rule    Matched rule from ACTION_RULES.
+	 * @param string $capture Regex capture group (title or search term).
+	 * @return array
+	 */
+	private function action_intent( array $rule, string $capture ): array {
+		return array(
+			'type'             => 'action',
+			'action_type'      => (string) ( $rule['action_type'] ?? '' ),
+			'post_type'        => (string) ( $rule['post_type'] ?? 'post' ),
+			'status'           => (string) ( $rule['status'] ?? '' ),
+			'search_term'      => sanitize_text_field( $capture ),
+			'requires_confirm' => (bool) ( $rule['requires_confirm'] ?? false ),
+			'confidence'       => (float) ( $rule['confidence'] ?? 0.88 ),
 		);
 	}
 

@@ -19,9 +19,10 @@ final class Dewey_Engine {
 	 * @param array<int,array{role:string,text:string}> $history
 	 * @param string                              $page_context  wp-admin screen slug (e.g. "edit", "post", "dashboard").
 	 * @param int                                 $post_id       ID of the post currently open in the editor (0 = none).
+	 * @param array<string,mixed>                 $screen_context Structured wp-admin screen context.
 	 * @return array<string,mixed>|WP_Error
 	 */
-	public static function answer_question( string $question, string $assistant_system_prompt = '', array $history = array(), string $page_context = '', int $post_id = 0 ) {
+	public static function answer_question( string $question, string $assistant_system_prompt = '', array $history = array(), string $page_context = '', int $post_id = 0, array $screen_context = array() ) {
 		$question = trim( wp_strip_all_tags( $question ) );
 		if ( '' === $question ) {
 			return new WP_Error( 'dewey_invalid_question', 'Question cannot be empty.', array( 'status' => 400 ) );
@@ -29,6 +30,10 @@ final class Dewey_Engine {
 
 		$intent_router = new Dewey_Intent_Router();
 		$intent        = $intent_router->route( $question );
+		if ( 'action' === ( $intent['type'] ?? '' ) ) {
+			return self::handle_action_intent( $intent );
+		}
+
 		if ( 'settings' === ( $intent['type'] ?? '' ) && ! empty( $intent['requires_confirm'] ) ) {
 			$token = Dewey_REST_Controller::create_confirm_token(
 				(string) ( $intent['action'] ?? '' ),
@@ -50,9 +55,39 @@ final class Dewey_Engine {
 			return self::apply_non_confirm_settings_intent( $intent );
 		}
 
-		$retrieval = self::retrieve_context( $question );
+		$retrieval = self::retrieve_context( $question, $screen_context );
 		if ( is_wp_error( $retrieval ) ) {
 			return $retrieval;
+		}
+		if (
+			! empty( $retrieval['citations'] ) &&
+			self::is_archive_lookup_question( $question ) &&
+			(float) ( $retrieval['confidence'] ?? 0 ) < 0.28
+		) {
+			$clarification = self::build_low_confidence_clarification(
+				$question,
+				$retrieval['citations']
+			);
+			self::record_query_telemetry(
+				array(
+					'total_queries'                => 1,
+					'retrieval_hits'               => 1,
+					'retrieval_misses'             => 0,
+					'low_confidence_clarifications' => 1,
+				)
+			);
+			return array(
+				'answer'     => $clarification['answer'],
+				'follow_ups' => $clarification['follow_ups'],
+				'citations'  => $retrieval['citations'],
+				'meta'       => array(
+					'retrieval_mode' => $retrieval['retrieval_mode'],
+					'result_count'   => count( $retrieval['citations'] ),
+					'provider'       => '',
+					'model'          => '',
+					'confidence'     => (float) ( $retrieval['confidence'] ?? 0 ),
+				),
+			);
 		}
 		if (
 			empty( $retrieval['citations'] ) &&
@@ -73,6 +108,7 @@ final class Dewey_Engine {
 					'suggestion_count'      => count( $suggestions ),
 					'title_fallback_hits'   => 0,
 					'date_bias_applied'     => ! empty( $retrieval['date_bias_applied'] ) ? 1 : 0,
+					'screen_filter_applied' => ! empty( $retrieval['screen_filter_applied'] ) ? 1 : 0,
 				)
 			);
 			return array(
@@ -88,7 +124,7 @@ final class Dewey_Engine {
 			);
 		}
 
-		$answer_result = self::generate_answer( $question, $retrieval['context_blocks'], $assistant_system_prompt, $history, $page_context, $post_id );
+		$answer_result = self::generate_answer( $question, $retrieval['context_blocks'], $assistant_system_prompt, $history, $page_context, $post_id, $screen_context );
 		if ( is_wp_error( $answer_result ) ) {
 			return $answer_result;
 		}
@@ -102,6 +138,7 @@ final class Dewey_Engine {
 				'suggestion_count'      => 0,
 				'title_fallback_hits'   => ! empty( $retrieval['title_fallback_used'] ) ? 1 : 0,
 				'date_bias_applied'     => ! empty( $retrieval['date_bias_applied'] ) ? 1 : 0,
+				'screen_filter_applied' => ! empty( $retrieval['screen_filter_applied'] ) ? 1 : 0,
 			)
 		);
 
@@ -112,6 +149,7 @@ final class Dewey_Engine {
 			'meta'       => array(
 				'retrieval_mode' => $retrieval['retrieval_mode'],
 				'result_count'   => count( $retrieval['citations'] ),
+				'confidence'     => (float) ( $retrieval['confidence'] ?? 0 ),
 				'provider'       => $answer_result['provider'],
 				'model'          => $answer_result['model'],
 			),
@@ -121,7 +159,7 @@ final class Dewey_Engine {
 	/**
 	 * @return array<string,mixed>|WP_Error
 	 */
-	private static function retrieve_context( string $question ) {
+	private static function retrieve_context( string $question, array $screen_context = array() ) {
 		$settings       = Dewey_Settings::get_all();
 		$mode           = (string) ( $settings['retrieval_mode'] ?? 'core' );
 		$effective_mode = self::resolve_retrieval_mode( $mode );
@@ -138,7 +176,7 @@ final class Dewey_Engine {
 		$title_fallback_used = false;
 
 		foreach ( $search_terms as $term ) {
-			$term_results = self::search_with_mode( $term, $effective_mode );
+			$term_results = self::search_with_mode( $term, $effective_mode, $screen_context );
 
 			if ( ! is_array( $term_results ) ) {
 				continue;
@@ -159,7 +197,7 @@ final class Dewey_Engine {
 		}
 
 		if ( empty( $merged ) ) {
-			$title_fallback = self::search_title_fallback( $question, $effective_mode, $max_total );
+			$title_fallback = self::search_title_fallback( $question, $effective_mode, $max_total, $screen_context );
 			$title_fallback_used = ! empty( $title_fallback );
 			foreach ( $title_fallback as $result ) {
 				$post_id = (int) ( $result['post_id'] ?? 0 );
@@ -184,6 +222,7 @@ final class Dewey_Engine {
 		);
 
 		$raw_results = array_values( array_slice( $merged, 0, $max_total ) );
+		$confidence  = self::calculate_retrieval_confidence( $raw_results );
 
 		if ( ! is_array( $raw_results ) ) {
 			return new WP_Error( 'dewey_retrieval_failed', __( 'Archive retrieval failed.', 'dewey' ), array( 'status' => 500 ) );
@@ -217,6 +256,8 @@ final class Dewey_Engine {
 			'context_blocks' => $contexts,
 			'title_fallback_used' => $title_fallback_used,
 			'date_bias_applied'   => $date_bias_applied,
+			'screen_filter_applied' => ! empty( self::build_screen_filters( $screen_context ) ),
+			'confidence'          => $confidence,
 		);
 	}
 
@@ -275,7 +316,7 @@ final class Dewey_Engine {
 	/**
 	 * @return array<int,array<string,mixed>>
 	 */
-	private static function search_core( string $question ): array {
+	private static function search_core( string $question, array $screen_context = array() ): array {
 		$settings   = Dewey_Settings::get_all();
 		$post_types = is_array( $settings['indexed_post_types'] ?? null )
 			? $settings['indexed_post_types']
@@ -296,6 +337,7 @@ final class Dewey_Engine {
 				'update_post_term_cache' => false,
 			)
 		);
+		$filters = self::build_screen_filters( $screen_context );
 
 		$results = array();
 		foreach ( $query->posts as $post ) {
@@ -314,10 +356,11 @@ final class Dewey_Engine {
 				'permalink' => get_permalink( $post ),
 				'snippet'   => wp_trim_words( $text, 80, '…' ),
 				'modified'  => get_post_modified_time( 'c', true, $post ),
+				'post_type' => (string) $post->post_type,
 			);
 		}
 
-		return $results;
+		return self::apply_screen_filters( $results, $filters );
 	}
 
 	/**
@@ -327,12 +370,14 @@ final class Dewey_Engine {
 	 * @param string $mode
 	 * @return array<int,array<string,mixed>>
 	 */
-	private static function search_with_mode( string $term, string $mode ): array {
+	private static function search_with_mode( string $term, string $mode, array $screen_context = array() ): array {
+		$filters = self::build_screen_filters( $screen_context );
 		if ( 'indexed' === $mode ) {
-			return Dewey_Indexer::search_index( $term );
+			$results = Dewey_Indexer::search_index( $term );
+			return self::apply_screen_filters( $results, $filters );
 		}
 
-		return self::search_core( $term );
+		return self::search_core( $term, $screen_context );
 	}
 
 	/**
@@ -343,7 +388,7 @@ final class Dewey_Engine {
 	 * @param int    $limit
 	 * @return array<int,array<string,mixed>>
 	 */
-	private static function search_title_fallback( string $question, string $mode, int $limit ): array {
+	private static function search_title_fallback( string $question, string $mode, int $limit, array $screen_context = array() ): array {
 		$phrase = self::extract_title_phrase( $question );
 		if ( '' === $phrase ) {
 			return array();
@@ -354,7 +399,7 @@ final class Dewey_Engine {
 		$seen    = array();
 
 		foreach ( $queries as $query ) {
-			$results = self::search_with_mode( $query, $mode );
+			$results = self::search_with_mode( $query, $mode, $screen_context );
 			foreach ( $results as $result ) {
 				$post_id = (int) ( $result['post_id'] ?? 0 );
 				$title   = strtolower( (string) ( $result['title'] ?? '' ) );
@@ -637,7 +682,7 @@ final class Dewey_Engine {
 	 * @param int                                       $post_id       Post currently open in the editor.
 	 * @return array<string,mixed>|WP_Error
 	 */
-	private static function generate_answer( string $question, array $context_blocks, string $assistant_system_prompt, array $history = array(), string $page_context = '', int $post_id = 0 ) {
+	private static function generate_answer( string $question, array $context_blocks, string $assistant_system_prompt, array $history = array(), string $page_context = '', int $post_id = 0, array $screen_context = array() ) {
 		if ( ! function_exists( 'wp_ai_client_prompt' ) ) {
 			return new WP_Error(
 				'dewey_ai_unavailable',
@@ -675,6 +720,10 @@ final class Dewey_Engine {
 		// e.g. if the user is on "edit" they're looking at a posts list; "post" means the editor.
 		if ( '' !== $page_context ) {
 			$system_instruction = 'Current wp-admin screen: ' . $page_context . "\n\n" . $system_instruction;
+		}
+		$screen_adapter_context = self::build_screen_adapter_context( $screen_context );
+		if ( '' !== $screen_adapter_context ) {
+			$system_instruction = $screen_adapter_context . "\n\n" . $system_instruction;
 		}
 
 		// Prepend the specific post being edited so Dewey can reference it by name.
@@ -780,6 +829,250 @@ final class Dewey_Engine {
 			'follow_ups' => $follow_ups,
 			'provider'   => '',
 			'model'      => '',
+		);
+	}
+
+	/**
+	 * Route an action intent to either direct execution or a confirmation proposal.
+	 *
+	 * Non-destructive actions (create, list) execute immediately.
+	 * Destructive actions (trash, publish) return a signed token the user must
+	 * confirm before the frontend calls /execute-action.
+	 *
+	 * @param array<string,mixed> $intent
+	 * @return array<string,mixed>|WP_Error
+	 */
+	private static function handle_action_intent( array $intent ) {
+		$action_type = (string) ( $intent['action_type'] ?? '' );
+		$post_type   = (string) ( $intent['post_type'] ?? 'post' );
+		$status      = (string) ( $intent['status'] ?? '' );
+		$search_term = (string) ( $intent['search_term'] ?? '' );
+
+		switch ( $action_type ) {
+
+			// ------------------------------------------------------------------
+			// Create post / page — always draft, always immediate
+			// ------------------------------------------------------------------
+			case 'create_post':
+				$title = '' !== $search_term ? $search_term : __( 'Untitled', 'dewey' );
+				$result = Dewey_Action_Handler::create_post(
+					array(
+						'title'     => $title,
+						'post_type' => $post_type,
+					)
+				);
+
+				if ( is_wp_error( $result ) ) {
+					return array(
+						'answer'    => $result->get_error_message(),
+						'citations' => array(),
+					);
+				}
+
+				$type_label = 'page' === ( $result['post_type'] ?? '' )
+					? __( 'page', 'dewey' )
+					: __( 'post', 'dewey' );
+
+				return array(
+					'answer'        => sprintf(
+						/* translators: 1: post type label 2: post title */
+						__( 'Done — I created a draft %1$s called "%2$s". Open it in the editor to add your content.', 'dewey' ),
+						$type_label,
+						esc_html( (string) ( $result['title'] ?? '' ) )
+					),
+					'action_result' => array(
+						'type'     => 'create_post',
+						'post_id'  => (int) ( $result['post_id'] ?? 0 ),
+						'title'    => (string) ( $result['title'] ?? '' ),
+						'edit_url' => (string) ( $result['edit_url'] ?? '' ),
+					),
+					'citations'  => array(),
+					'follow_ups' => array(),
+				);
+
+			// ------------------------------------------------------------------
+			// List posts — immediate, read-only
+			// ------------------------------------------------------------------
+			case 'list_posts':
+				$result = Dewey_Action_Handler::list_posts(
+					array(
+						'post_type' => $post_type,
+						'status'    => '' !== $status ? $status : 'any',
+						'count'     => 5,
+					)
+				);
+
+				if ( is_wp_error( $result ) ) {
+					return array(
+						'answer'    => $result->get_error_message(),
+						'citations' => array(),
+					);
+				}
+
+				$posts = (array) ( $result['posts'] ?? array() );
+
+				if ( empty( $posts ) ) {
+					return array(
+						'answer'        => __( "I didn't find any matching content. Try a different filter or check Posts in the admin menu.", 'dewey' ),
+						'action_result' => array( 'type' => 'list_posts', 'posts' => array() ),
+						'citations'     => array(),
+					);
+				}
+
+				$lines = array_map(
+					static fn( array $p ) => sprintf( '- **%s** (%s)', $p['title'], $p['status'] ),
+					$posts
+				);
+
+				/* translators: 1: count 2: post type (plural) */
+				$intro  = sprintf( _n( 'Here\'s %1$d %2$s:', 'Here are %1$d %2$ss:', count( $posts ), 'dewey' ), count( $posts ), $result['post_type'] );
+				$answer = $intro . "\n" . implode( "\n", $lines );
+
+				return array(
+					'answer'        => $answer,
+					'action_result' => array(
+						'type'  => 'list_posts',
+						'posts' => $posts,
+					),
+					'citations'  => array(),
+					'follow_ups' => array(),
+				);
+
+			// ------------------------------------------------------------------
+			// Trash post — requires confirmation
+			// ------------------------------------------------------------------
+			case 'trash_post':
+				if ( '' === $search_term ) {
+					return array(
+						'answer'    => __( "Which post do you want to trash? Give me a title or a few words from it.", 'dewey' ),
+						'citations' => array(),
+					);
+				}
+
+				$post = Dewey_Action_Handler::find_by_term( $search_term );
+				if ( ! $post ) {
+					return array(
+						'answer'    => sprintf(
+							/* translators: %s: search term */
+							__( 'I couldn\'t find a post matching "%s". Try a more specific title.', 'dewey' ),
+							esc_html( $search_term )
+						),
+						'citations' => array(),
+					);
+				}
+
+				if ( ! current_user_can( 'delete_post', $post->ID ) ) {
+					return array(
+						'answer'    => __( "You don't have permission to delete that post.", 'dewey' ),
+						'citations' => array(),
+					);
+				}
+
+				$post_title = (string) get_the_title( $post );
+				$token      = Dewey_REST_Controller::create_action_token(
+					'trash_post',
+					array(
+						'post_id'    => $post->ID,
+						'post_title' => $post_title,
+					)
+				);
+
+				return array(
+					'answer'          => sprintf(
+						/* translators: 1: post title 2: post status */
+						__( 'I found "%1$s" (currently %2$s). Move it to trash?', 'dewey' ),
+						esc_html( $post_title ),
+						$post->post_status
+					),
+					'proposed_action' => array(
+						'type'        => 'trash_post',
+						'label'       => sprintf(
+							/* translators: %s: post title */
+							__( 'Move "%s" to trash', 'dewey' ),
+							$post_title
+						),
+						'destructive' => true,
+						'token'       => $token,
+					),
+					'citations'  => array(),
+					'follow_ups' => array(),
+				);
+
+			// ------------------------------------------------------------------
+			// Publish post — requires confirmation
+			// ------------------------------------------------------------------
+			case 'publish_post':
+				if ( '' === $search_term ) {
+					return array(
+						'answer'    => __( "Which post do you want to publish? Give me a title or a few words from it.", 'dewey' ),
+						'citations' => array(),
+					);
+				}
+
+				$post = Dewey_Action_Handler::find_by_term( $search_term );
+				if ( ! $post ) {
+					return array(
+						'answer'    => sprintf(
+							/* translators: %s: search term */
+							__( 'I couldn\'t find a post matching "%s". Try a more specific title.', 'dewey' ),
+							esc_html( $search_term )
+						),
+						'citations' => array(),
+					);
+				}
+
+				if ( ! current_user_can( 'edit_post', $post->ID ) || ! current_user_can( 'publish_posts' ) ) {
+					return array(
+						'answer'    => __( "You don't have permission to publish that post.", 'dewey' ),
+						'citations' => array(),
+					);
+				}
+
+				if ( 'publish' === $post->post_status ) {
+					return array(
+						'answer'    => sprintf(
+							/* translators: %s: post title */
+							__( '"%s" is already live — nothing to do.', 'dewey' ),
+							esc_html( (string) get_the_title( $post ) )
+						),
+						'citations' => array(),
+					);
+				}
+
+				$post_title = (string) get_the_title( $post );
+				$token      = Dewey_REST_Controller::create_action_token(
+					'publish_post',
+					array(
+						'post_id'    => $post->ID,
+						'post_title' => $post_title,
+					)
+				);
+
+				return array(
+					'answer'          => sprintf(
+						/* translators: 1: post title 2: post status */
+						__( 'I found "%1$s" (currently %2$s). Go ahead and publish it?', 'dewey' ),
+						esc_html( $post_title ),
+						$post->post_status
+					),
+					'proposed_action' => array(
+						'type'        => 'publish_post',
+						'label'       => sprintf(
+							/* translators: %s: post title */
+							__( 'Publish "%s"', 'dewey' ),
+							$post_title
+						),
+						'destructive' => true,
+						'token'       => $token,
+					),
+					'citations'  => array(),
+					'follow_ups' => array(),
+				);
+		}
+
+		return array(
+			'answer'    => __( "I'm not sure how to handle that action — try rephrasing.", 'dewey' ),
+			'citations' => array(),
 		);
 	}
 
@@ -983,6 +1276,195 @@ final class Dewey_Engine {
 	}
 
 	/**
+	 * Build deterministic clarification prompt when retrieval confidence is low.
+	 *
+	 * @param string                    $question
+	 * @param array<int,array<string,mixed>> $citations
+	 * @return array{answer:string,follow_ups:array<int,string>}
+	 */
+	private static function build_low_confidence_clarification( string $question, array $citations ): array {
+		$titles = array();
+		foreach ( array_slice( $citations, 0, 3 ) as $citation ) {
+			$title = trim( (string) ( $citation['title'] ?? '' ) );
+			if ( '' !== $title ) {
+				$titles[] = $title;
+			}
+		}
+
+		$answer = sprintf(
+			/* translators: %s: user question */
+			__( 'I found some possible matches for "%s", but confidence is low. Point me at the right one and I will go deeper.', 'dewey' ),
+			self::safe_substr( trim( $question ), 120 )
+		);
+		if ( ! empty( $titles ) ) {
+			$answer .= "\n\n" . __( 'Closest candidates:', 'dewey' ) . "\n";
+			foreach ( $titles as $title ) {
+				$answer .= '- ' . $title . "\n";
+			}
+		}
+
+		return array(
+			'answer'     => $answer,
+			'follow_ups' => array(
+				__( 'Which title is the one you meant?', 'dewey' ),
+				__( 'Do you remember a tag or category for it?', 'dewey' ),
+				__( 'Should I narrow by date range?', 'dewey' ),
+			),
+		);
+	}
+
+	/**
+	 * Estimate retrieval confidence from score spread and top-score magnitude.
+	 *
+	 * @param array<int,array<string,mixed>> $results
+	 * @return float
+	 */
+	private static function calculate_retrieval_confidence( array $results ): float {
+		if ( empty( $results ) ) {
+			return 0.0;
+		}
+		$top_score    = (float) ( $results[0]['score'] ?? 0.0 );
+		$second_score = (float) ( $results[1]['score'] ?? 0.0 );
+		if ( $top_score <= 0.0 ) {
+			return 0.0;
+		}
+
+		$ratio      = $second_score > 0.0 ? ( $top_score / $second_score ) : 3.0;
+		$ratio_part = min( 1.0, max( 0.0, ( $ratio - 1.0 ) / 2.0 ) );
+		$score_part = min( 1.0, $top_score / 8.0 );
+
+		return round( ( $ratio_part * 0.6 ) + ( $score_part * 0.4 ), 3 );
+	}
+
+	/**
+	 * Build retrieval filters inferred from current screen context.
+	 *
+	 * @param array<string,mixed> $screen_context
+	 * @return array<string,string>
+	 */
+	private static function build_screen_filters( array $screen_context ): array {
+		$filters   = array();
+		$base      = sanitize_key( (string) ( $screen_context['base'] ?? '' ) );
+		$post_type = sanitize_key( (string) ( $screen_context['post_type'] ?? '' ) );
+
+		if ( in_array( $base, array( 'edit', 'post' ), true ) && '' !== $post_type ) {
+			$filters['post_type'] = $post_type;
+		}
+
+		return $filters;
+	}
+
+	/**
+	 * Apply retrieval filters to result rows.
+	 *
+	 * @param array<int,array<string,mixed>> $results
+	 * @param array<string,string>           $filters
+	 * @return array<int,array<string,mixed>>
+	 */
+	private static function apply_screen_filters( array $results, array $filters ): array {
+		if ( empty( $filters ) ) {
+			return $results;
+		}
+
+		$filtered = array();
+		foreach ( $results as $result ) {
+			$matches = true;
+			if ( isset( $filters['post_type'] ) ) {
+				$row_post_type = sanitize_key( (string) ( $result['post_type'] ?? '' ) );
+				if ( '' !== $row_post_type && $row_post_type !== $filters['post_type'] ) {
+					$matches = false;
+				}
+			}
+			if ( $matches ) {
+				$filtered[] = $result;
+			}
+		}
+
+		return $filtered;
+	}
+
+	/**
+	 * Build screen-specific context text blocks for better non-archive reasoning.
+	 *
+	 * @param array<string,mixed> $screen_context
+	 * @return string
+	 */
+	private static function build_screen_adapter_context( array $screen_context ): string {
+		if ( empty( $screen_context ) ) {
+			return '';
+		}
+
+		$base  = sanitize_key( (string) ( $screen_context['base'] ?? '' ) );
+		$title = sanitize_text_field( (string) ( $screen_context['title'] ?? '' ) );
+		$stats = is_array( $screen_context['stats'] ?? null ) ? $screen_context['stats'] : array();
+
+		$lines = array();
+		if ( '' !== $base ) {
+			$lines[] = 'Current admin base: ' . $base;
+		}
+		if ( '' !== $title ) {
+			$lines[] = 'Current screen title: ' . $title;
+		}
+
+		if ( 0 === strpos( $base, 'settings_page' ) ) {
+			$lines[] = sprintf(
+				'Settings overview: site="%s", timezone="%s", posts_per_page=%d.',
+				(string) ( $stats['site_title'] ?? '' ),
+				(string) ( $stats['timezone'] ?? '' ),
+				(int) ( $stats['posts_per_page'] ?? 0 )
+			);
+			return implode( "\n", array_filter( $lines ) );
+		}
+
+		switch ( $base ) {
+			case 'plugins':
+				$lines[] = sprintf(
+					'Plugins overview: total=%d, active=%d.',
+					(int) ( $stats['total_plugins'] ?? 0 ),
+					(int) ( $stats['active_plugins'] ?? 0 )
+				);
+				break;
+			case 'themes':
+				$lines[] = sprintf(
+					'Themes overview: total=%d, active=%s.',
+					(int) ( $stats['total_themes'] ?? 0 ),
+					(string) ( $stats['active_theme'] ?? '' )
+				);
+				break;
+			case 'users':
+				$lines[] = sprintf(
+					'Users overview: total users=%d.',
+					(int) ( $stats['total_users'] ?? 0 )
+				);
+				break;
+			case 'upload':
+				$lines[] = sprintf(
+					'Media overview: items=%d.',
+					(int) ( $stats['media_items'] ?? 0 )
+				);
+				break;
+			case 'edit':
+			case 'post':
+				$lines[] = sprintf(
+					'Content overview: published=%d, drafts=%d.',
+					(int) ( $stats['published'] ?? 0 ),
+					(int) ( $stats['draft'] ?? 0 )
+				);
+				break;
+			case 'options-general':
+				$lines[] = sprintf(
+					'Settings overview: site="%s", timezone="%s", posts_per_page=%d.',
+					(string) ( $stats['site_title'] ?? '' ),
+					(string) ( $stats['timezone'] ?? '' ),
+					(int) ( $stats['posts_per_page'] ?? 0 )
+				);
+				break;
+		}
+
+		return implode( "\n", array_filter( $lines ) );
+	}
+
+	/**
 	 * Retrieve aggregate query telemetry counters for status/debug output.
 	 *
 	 * @return array<string,mixed>
@@ -1004,6 +1486,8 @@ final class Dewey_Engine {
 				'suggestion_count'      => 0,
 				'title_fallback_hits'   => 0,
 				'date_bias_applied'     => 0,
+				'screen_filter_applied' => 0,
+				'low_confidence_clarifications' => 0,
 				'last_updated'          => '',
 			)
 		);

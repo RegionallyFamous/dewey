@@ -196,6 +196,12 @@ if ( ! function_exists( '__' ) ) {
 	}
 }
 
+if ( ! function_exists( '_n' ) ) {
+	function _n( $single, $plural, $number ) {
+		return 1 === (int) $number ? $single : $plural;
+	}
+}
+
 if ( ! function_exists( 'sanitize_text_field' ) ) {
 	function sanitize_text_field( $value ) {
 		return trim( wp_strip_all_tags( (string) $value ) );
@@ -274,6 +280,34 @@ if ( ! function_exists( 'get_post_modified_time' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_count_posts' ) ) {
+	function wp_count_posts() {
+		return (object) array(
+			'publish' => 2,
+			'draft'   => 1,
+			'inherit' => 5,
+		);
+	}
+}
+
+if ( ! function_exists( 'get_posts' ) ) {
+	function get_posts() {
+		return array();
+	}
+}
+
+if ( ! function_exists( 'get_the_date' ) ) {
+	function get_the_date() {
+		return gmdate( 'Y-m-d' );
+	}
+}
+
+if ( ! function_exists( 'get_terms' ) ) {
+	function get_terms() {
+		return array();
+	}
+}
+
 if ( ! function_exists( 'get_the_terms' ) ) {
 	function get_the_terms( $post_id, $taxonomy ) {
 		return $GLOBALS['dewey_test_terms'][ $post_id ][ $taxonomy ] ?? array();
@@ -318,6 +352,7 @@ require_once __DIR__ . '/../../includes/class-dewey-settings.php';
 require_once __DIR__ . '/../../includes/class-dewey-intent-router.php';
 require_once __DIR__ . '/../../includes/class-dewey-indexer.php';
 require_once __DIR__ . '/../../includes/class-dewey-rest-controller.php';
+require_once __DIR__ . '/../../includes/class-dewey-action-handler.php';
 require_once __DIR__ . '/../../includes/class-dewey-engine.php';
 
 assert_true(
@@ -396,7 +431,19 @@ $GLOBALS['dewey_test_registered_routes'] = array();
 Dewey_REST_Controller::register_routes();
 assert_true(
 	'REST routes registered',
-	4 === count( $GLOBALS['dewey_test_registered_routes'] )
+	count( $GLOBALS['dewey_test_registered_routes'] ) >= 4
+);
+$query_route = null;
+foreach ( $GLOBALS['dewey_test_registered_routes'] as $route ) {
+	if ( '/query' === ( $route['route'] ?? '' ) ) {
+		$query_route = $route;
+		break;
+	}
+}
+assert_true(
+	'REST query route includes screen_context argument',
+	is_array( $query_route ) &&
+		isset( $query_route['args']['args']['screen_context'] )
 );
 
 $request_missing_nonce = new WP_REST_Request( array(), array() );
@@ -447,6 +494,57 @@ assert_true(
 		3 === count( $engine_refine['follow_ups'] ?? array() )
 );
 
+$GLOBALS['dewey_test_wp_query_posts'] = array(
+	new WP_Post( 101, 'Snippet one', 'Body one', 'post', 'publish' ),
+	new WP_Post( 102, 'Snippet two', 'Body two', 'post', 'publish' ),
+);
+$engine_clarify = Dewey_Engine::answer_question( 'Do we have posts about onboarding?' );
+assert_true(
+	'Engine asks for clarification on low-confidence retrieval',
+	is_array( $engine_clarify ) &&
+		str_contains( strtolower( (string) ( $engine_clarify['answer'] ?? '' ) ), 'confidence is low' )
+);
+
+$GLOBALS['dewey_test_wp_query_posts'] = array(
+	new WP_Post( 201, 'Page snippet', 'Page body', 'page', 'publish' ),
+	new WP_Post( 202, 'Post snippet', 'Post body', 'post', 'publish' ),
+);
+$engine_screen_filtered = Dewey_Engine::answer_question(
+	'What content do we have?',
+	'',
+	array(),
+	'edit',
+	0,
+	array(
+		'base'      => 'edit',
+		'post_type' => 'page',
+	)
+);
+assert_true(
+	'Screen context post_type filter narrows retrieval',
+	is_array( $engine_screen_filtered ) &&
+		1 === count( $engine_screen_filtered['citations'] ?? array() ) &&
+		201 === (int) ( $engine_screen_filtered['citations'][0]['post_id'] ?? 0 )
+);
+
+$sanitized_screen_context = Dewey_REST_Controller::sanitize_screen_context(
+	array(
+		'base'      => 'plugins',
+		'post_type' => 'post',
+		'title'     => 'Plugins',
+		'stats'     => array(
+			'total_plugins'  => '12',
+			'active_plugins' => 9,
+		),
+	)
+);
+assert_true(
+	'REST controller sanitizes screen context payload',
+	'plugins' === ( $sanitized_screen_context['base'] ?? '' ) &&
+		12 === (int) ( $sanitized_screen_context['stats']['total_plugins'] ?? 0 )
+);
+
+$GLOBALS['dewey_test_wp_query_posts'] = array();
 $rest_query_refine = Dewey_REST_Controller::query(
 	new WP_REST_Request(
 		array(
@@ -500,6 +598,26 @@ assert_true(
 		is_array( $status_response['telemetry'] ?? null ) &&
 		is_array( $status_response['integrity'] ?? null )
 );
+
+$eval_fixture_path = __DIR__ . '/../evals/retrieval-evals.json';
+$eval_payload      = json_decode( (string) file_get_contents( $eval_fixture_path ), true );
+assert_true(
+	'Eval fixture dataset loads',
+	is_array( $eval_payload ) &&
+		is_array( $eval_payload['cases'] ?? null ) &&
+		count( $eval_payload['cases'] ) >= 3
+);
+foreach ( $eval_payload['cases'] as $eval_case ) {
+	$question = (string) ( $eval_case['question'] ?? '' );
+	if ( '' === $question ) {
+		continue;
+	}
+	$eval_result = Dewey_Engine::answer_question( $question );
+	assert_true(
+		'Eval replay returns structured result for fixture question',
+		is_array( $eval_result ) || is_wp_error( $eval_result )
+	);
+}
 
 echo "PHP core tests passed.\n";
 

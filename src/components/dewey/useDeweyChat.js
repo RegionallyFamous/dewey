@@ -221,6 +221,15 @@ function getApiConfig() {
 	};
 }
 
+function getScreenContextPayload() {
+	const raw = window.deweyConfig?.screenContext;
+	if ( ! raw || typeof raw !== 'object' || Array.isArray( raw ) ) {
+		return {};
+	}
+
+	return raw;
+}
+
 async function callDeweyApi( path, payload = null ) {
 	const config = getApiConfig();
 	if ( ! config ) {
@@ -707,6 +716,7 @@ export function useDeweyChat() {
 							? window.pagenow
 							: '',
 					post_id: getCurrentPostId(),
+					screen_context: getScreenContextPayload(),
 				} );
 				setIsAiConnected( true );
 
@@ -730,6 +740,37 @@ export function useDeweyChat() {
 							],
 						}
 					);
+					return;
+				}
+
+				// Content action proposal — destructive actions need a confirm step.
+				if ( response?.proposed_action ) {
+					const pa = response.proposed_action;
+					deweyHandlers.onAnswerReady( 1 );
+					addMessage( 'assistant', String( response.answer || '' ), {
+						actions: pa.token
+							? [
+									{
+										id: `exec-${ pa.token.slice( 0, 16 ) }`,
+										label: String(
+											pa.label || __( 'Confirm', 'dewey' )
+										),
+										kind: 'execute-action',
+										token: pa.token,
+										destructive: Boolean( pa.destructive ),
+									},
+							  ]
+							: undefined,
+					} );
+					return;
+				}
+
+				// Direct action result (create, list) — action already executed.
+				if ( response?.action_result ) {
+					deweyHandlers.onAnswerReady( 1 );
+					addMessage( 'assistant', String( response.answer || '' ), {
+						action_result: response.action_result,
+					} );
 					return;
 				}
 
@@ -843,6 +884,33 @@ export function useDeweyChat() {
 
 			if ( action.kind === 'retry' && action.question ) {
 				await submitQuestion( String( action.question ) );
+				return;
+			}
+
+			if ( action.kind === 'execute-action' && action.token ) {
+				try {
+					const response = await callDeweyApi( '/execute-action', {
+						token: action.token,
+						approved: true,
+					} );
+					addMessage(
+						'assistant',
+						String( response?.message || __( 'Done.', 'dewey' ) ),
+						response?.result?.edit_url ||
+							response?.result?.permalink
+							? {
+									action_result: response.result,
+							  }
+							: {}
+					);
+				} catch ( error ) {
+					addMessage(
+						'assistant',
+						error instanceof Error
+							? error.message
+							: __( 'Action failed — please try again.', 'dewey' )
+					);
+				}
 				return;
 			}
 

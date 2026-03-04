@@ -5,6 +5,7 @@
  * for UI state, actions, and copy.
  */
 
+import { useCallback } from '@wordpress/element';
 import {
 	DeweyFab,
 	DeweyPanel,
@@ -32,8 +33,26 @@ export default function App() {
 		handleSubmit,
 	} = useDeweyChat();
 
-	const { suggestions: navSuggestions, navigate: handleNavigate } =
-		useNavigationCommands( isOpen ? inputValue : '' );
+	const {
+		suggestions: navSuggestions,
+		navigate: handleNavigate,
+		getTopNavMatch,
+	} = useNavigationCommands( isOpen ? inputValue : '' );
+
+	// Before firing the AI query, check whether the user's intent is clearly
+	// navigational. If we get a high-confidence command match, go there instead.
+	const handleSubmitOrNavigate = useCallback(
+		( e ) => {
+			const navMatch = getTopNavMatch( inputValue );
+			if ( navMatch ) {
+				e.preventDefault();
+				handleNavigate( navMatch );
+				return;
+			}
+			handleSubmit( e );
+		},
+		[ inputValue, getTopNavMatch, handleNavigate, handleSubmit ]
+	);
 
 	return (
 		<div className="dewey-app">
@@ -50,7 +69,7 @@ export default function App() {
 					onClose={ closePanel }
 					onClearConversation={ clearConversation }
 					citationStyle={ citationStyle }
-					onSubmit={ handleSubmit }
+					onSubmit={ handleSubmitOrNavigate }
 					inputRef={ inputRef }
 					inputValue={ inputValue }
 					onInputChange={ setInputValue }

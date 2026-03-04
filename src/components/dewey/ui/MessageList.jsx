@@ -10,6 +10,89 @@ import MarkdownText from './MarkdownText';
 const COPY_FEEDBACK_MS = 2000;
 const TIMESTAMP_TICK_MS = 30_000;
 
+function ActionResult( { result } ) {
+	if ( ! result ) {
+		return null;
+	}
+
+	if ( result.type === 'create_post' && result.edit_url ) {
+		return (
+			<div className="dewey-action-result">
+				<a
+					className="dewey-action-result__link"
+					href={ result.edit_url }
+					target="_blank"
+					rel="noreferrer"
+				>
+					{ __( 'Open in editor', 'dewey' ) }
+					<span
+						className="dewey-action-result__arrow"
+						aria-hidden="true"
+					>
+						{ ' →' }
+					</span>
+				</a>
+			</div>
+		);
+	}
+
+	if ( result.type === 'publish_post' && result.permalink ) {
+		return (
+			<div className="dewey-action-result">
+				<a
+					className="dewey-action-result__link"
+					href={ result.permalink }
+					target="_blank"
+					rel="noreferrer"
+				>
+					{ __( 'View live post', 'dewey' ) }
+					<span
+						className="dewey-action-result__arrow"
+						aria-hidden="true"
+					>
+						{ ' →' }
+					</span>
+				</a>
+			</div>
+		);
+	}
+
+	if (
+		result.type === 'list_posts' &&
+		Array.isArray( result.posts ) &&
+		result.posts.length > 0
+	) {
+		return (
+			<ul className="dewey-action-result dewey-action-result--list">
+				{ result.posts.map( ( post ) => (
+					<li
+						key={ post.post_id }
+						className="dewey-action-result__post"
+					>
+						{ post.edit_url ? (
+							<a
+								href={ post.edit_url }
+								target="_blank"
+								rel="noreferrer"
+								className="dewey-action-result__post-link"
+							>
+								{ post.title }
+							</a>
+						) : (
+							<span>{ post.title }</span>
+						) }
+						<span className="dewey-action-result__post-status">
+							{ post.status }
+						</span>
+					</li>
+				) ) }
+			</ul>
+		);
+	}
+
+	return null;
+}
+
 function getRelativeTime( timestamp ) {
 	if ( ! timestamp ) {
 		return '';
@@ -181,6 +264,11 @@ function MessageList( {
 												action.kind === 'retry'
 													? 'dewey-message__action--retry'
 													: '',
+												action.kind ===
+													'execute-action' &&
+												action.destructive
+													? 'dewey-message__action--destructive'
+													: '',
 											]
 												.filter( Boolean )
 												.join( ' ' ) }
@@ -207,6 +295,10 @@ function MessageList( {
 									) ) }
 								</div>
 							) }
+
+						{ message.action_result && (
+							<ActionResult result={ message.action_result } />
+						) }
 
 						{ Array.isArray( message.citations ) &&
 							message.citations.length > 0 && (
