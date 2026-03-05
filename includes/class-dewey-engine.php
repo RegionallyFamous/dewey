@@ -1642,23 +1642,23 @@ final class Dewey_Engine {
 	 * @param float  $retrieval_confidence
 	 * @return bool
 	 */
-	private static function should_include_wp_knowledge( string $question, float $retrieval_confidence ): bool {
-		$is_technical = self::is_technical_wp_question( $question );
-		if ( ! $is_technical ) {
-			return false;
-		}
-		if ( $retrieval_confidence < 0.55 ) {
-			return true;
-		}
-		return 1 === preg_match( '/\b(rest api|hook|filter|register_|wp_query|nonce|capabilit|transient|taxonomy|custom post type|cpt)\b/i', strtolower( $question ) );
-	}
-
 	/**
+	 * Decide whether to consult the WordPress knowledge base for this question.
+	 *
+	 * When the site archive returned confident results the user is almost
+	 * certainly searching their own content, not asking how to use WordPress —
+	 * injecting reference docs on top would be noise. When confidence is low
+	 * the question is likely a how-to or conceptual question. We let
+	 * Dewey_Knowledge::find_relevant() make the final call: it requires a
+	 * minimum relevance score of 2.0, so truly unrelated questions come back
+	 * empty and nothing extra is injected.
+	 *
 	 * @param string $question
+	 * @param float  $retrieval_confidence
 	 * @return bool
 	 */
-	private static function is_technical_wp_question( string $question ): bool {
-		return 1 === preg_match( '/\b(wordpress|wp[-_]|plugin|theme|hook|filter|rest|endpoint|api|nonce|capability|cron|taxonomy|cpt|custom post type|wpdb|block editor|gutenberg)\b/i', strtolower( $question ) );
+	private static function should_include_wp_knowledge( string $question, float $retrieval_confidence ): bool {
+		return $retrieval_confidence < 0.55;
 	}
 
 	/**
