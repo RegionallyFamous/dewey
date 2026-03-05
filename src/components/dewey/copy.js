@@ -14,25 +14,17 @@ export const STORAGE_KEYS = {
 export const STARTER_ACTIONS = [
 	{
 		id: 'what-can-you-do',
-		label: __( 'What can you do?', 'dewey' ),
+		label: __( 'What can you help me with?', 'dewey' ),
 		reply: __(
-			"I know this site better than you do — every post, draft, tag, and category. Ask me to find something, spot a pattern, audit your content, or just explain how WordPress works. I also have opinions about your metadata, but I'll keep those to myself unless you ask.",
-			'dewey'
-		),
-	},
-	{
-		id: 'how-does-this-work',
-		label: __( 'How does this work?', 'dewey' ),
-		reply: __(
-			'You ask, I dig. I search your actual archive first so answers are grounded in your content, then fill in the gaps with general WordPress knowledge. Think of me as the search bar that actually gets what you meant.',
+			"Quite a bit. I can search everything you've published and find posts, pages, or patterns you've forgotten about. I can create drafts, publish posts, and clean things up — just ask. I can answer questions about running your WordPress site. And if you want to go somewhere in the dashboard, just tell me where.",
 			'dewey'
 		),
 	},
 	{
 		id: 'what-should-i-ask',
-		label: __( 'What should I ask first?', 'dewey' ),
+		label: __( 'What can I ask you to do?', 'dewey' ),
 		reply: __(
-			'Try something like "What have we published about onboarding since 2022?" or "Any posts that mention pricing but not retention?" The more specific, the better I get. Weird questions are welcome.',
+			"Lots of things. 'Create a draft about my new product launch' — done, and I'll hand you the link. 'What have I published this month?' — I'll pull the list. 'Publish my spring sale post' — I'll find it and ask you to confirm first. 'Take me to Media' — straight there. Try anything, the worst I can say is I'm not sure.",
 			'dewey'
 		),
 	},

@@ -4,7 +4,7 @@ Tags: ai, admin assistant, content management, writing assistant, productivity
 Requires at least: 7.0
 Tested up to: 7.0
 Requires PHP: 8.1
-Stable tag: 1.0.22
+Stable tag: 1.0.23
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -87,6 +87,14 @@ Any authenticated wp-admin user with at least the editor capability. Actions tha
 Dewey works with any provider configured through WordPress's built-in Settings > Connectors interface.
 
 == Changelog ==
+
+= 1.0.23 =
+* Fixed token verification failing for posts whose titles contain a period (e.g. "Version 2.0") — HMAC now always splits on the last dot, not the first.
+* Fixed settings-confirmation flow returning 403 for non-admin users (editors, authors) — the `/confirm-action` endpoint now correctly requires only `edit_posts` while still enforcing `manage_options` for the reindex action.
+* Performance: eliminated redundant `is_archive_lookup_question` call on every archive query (was running the same regex check twice per request).
+* Performance: removed wasteful screen-filter computation in the indexed retrieval path.
+* Performance: replaced O(n²) JSON.stringify loop in chat history storage with a single proportional trim pass.
+* Removed dead `.dewey-panel__loading-dots` CSS block and deprecated `-webkit-overflow-scrolling: touch` property.
 
 = 1.0.22 =
 * Easter eggs: 14 hidden responses to secret phrases (sudo, hello world, the loop haiku, wp_die(), coffee jitter, konami, 42, meaning of life, better than ChatGPT, who made you, tell me a joke, roast my site, are you AI, what can you do).

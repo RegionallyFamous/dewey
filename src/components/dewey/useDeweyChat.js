@@ -478,25 +478,31 @@ function saveMessages( msgs ) {
 		};
 		const serialized = JSON.stringify( envelope );
 		if ( serialized.length > STORAGE_MAX_BYTES ) {
-			// Drop older messages (but keep welcome) until it fits.
-			let trimmed = [ ...toStore ];
-			while (
-				trimmed.length > 2 &&
-				JSON.stringify( {
-					v: STORAGE_VERSION,
-					savedAt: Date.now(),
-					messages: trimmed,
-				} ).length > STORAGE_MAX_BYTES
-			) {
-				trimmed = [ welcome, ...trimmed.slice( 2 ) ];
-			}
+			// Estimate how many messages to keep proportionally, then verify once.
+			// This avoids an O(n²) loop of re-serializing on every trim step.
+			const ratio = STORAGE_MAX_BYTES / serialized.length;
+			const keepCount = Math.max(
+				1,
+				Math.floor( toStore.length * ratio ) - 1
+			);
+			const trimmed = [
+				welcome,
+				...toStore.slice( -Math.max( 0, keepCount - 1 ) ),
+			];
+			const trimmedSerialized = JSON.stringify( {
+				v: STORAGE_VERSION,
+				savedAt: Date.now(),
+				messages: trimmed,
+			} );
 			window.localStorage.setItem(
 				STORAGE_KEYS.messages,
-				JSON.stringify( {
-					v: STORAGE_VERSION,
-					savedAt: Date.now(),
-					messages: trimmed,
-				} )
+				trimmedSerialized.length <= STORAGE_MAX_BYTES
+					? trimmedSerialized
+					: JSON.stringify( {
+							v: STORAGE_VERSION,
+							savedAt: Date.now(),
+							messages: [ welcome ],
+					  } )
 			);
 			return;
 		}

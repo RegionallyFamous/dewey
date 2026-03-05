@@ -117,7 +117,7 @@ final class Dewey_REST_Controller {
 			'/confirm-action',
 			array(
 				'methods'             => WP_REST_Server::CREATABLE,
-				'permission_callback' => array( __CLASS__, 'can_reindex' ),
+				'permission_callback' => array( __CLASS__, 'can_query' ),
 				'callback'            => array( __CLASS__, 'confirm_action' ),
 				'args'                => array(
 					'token' => array(
@@ -323,6 +323,11 @@ final class Dewey_REST_Controller {
 		$params = is_array( $token_data['params'] ?? null ) ? $token_data['params'] : array();
 
 		if ( 'reindex_now' === $action ) {
+			// Reindexing is a privileged operation even though the route now
+			// accepts any edit_posts user (so settings confirms work for editors).
+			if ( ! current_user_can( 'manage_options' ) ) {
+				return new WP_Error( 'dewey_forbidden', __( 'You do not have permission to reindex.', 'dewey' ), array( 'status' => 403 ) );
+			}
 			$status = Dewey_Indexer::rebuild();
 			return rest_ensure_response(
 				array(
@@ -625,12 +630,17 @@ final class Dewey_REST_Controller {
 	 * @return array<string,mixed>|WP_Error
 	 */
 	private static function verify_action_token( string $token ) {
-		$parts = explode( '.', $token, 2 );
-		if ( 2 !== count( $parts ) ) {
+		// Use strrpos so a '.' inside a URL-encoded post title (e.g. "v2.0")
+		// doesn't split the token at the wrong position. The HMAC signature is
+		// 64-char hex and never contains a dot, so the last dot is always the
+		// separator between payload and signature.
+		$last_dot = strrpos( $token, '.' );
+		if ( false === $last_dot ) {
 			return new WP_Error( 'dewey_bad_token', __( 'Invalid action token.', 'dewey' ), array( 'status' => 400 ) );
 		}
 
-		list( $encoded, $sig ) = $parts;
+		$encoded = substr( $token, 0, $last_dot );
+		$sig     = substr( $token, $last_dot + 1 );
 		$expected = hash_hmac( 'sha256', $encoded, wp_salt( 'auth' ) );
 		if ( ! hash_equals( $expected, $sig ) ) {
 			return new WP_Error( 'dewey_bad_token', __( 'Invalid action token.', 'dewey' ), array( 'status' => 400 ) );
@@ -671,12 +681,13 @@ final class Dewey_REST_Controller {
 	 * @return array<string,mixed>|WP_Error
 	 */
 	private static function verify_confirm_token( string $token ) {
-		$parts = explode( '.', $token, 2 );
-		if ( 2 !== count( $parts ) ) {
+		$last_dot = strrpos( $token, '.' );
+		if ( false === $last_dot ) {
 			return new WP_Error( 'dewey_bad_token', __( 'Invalid confirmation token.', 'dewey' ), array( 'status' => 400 ) );
 		}
 
-		list( $encoded, $sig ) = $parts;
+		$encoded = substr( $token, 0, $last_dot );
+		$sig     = substr( $token, $last_dot + 1 );
 		$expected = hash_hmac( 'sha256', $encoded, wp_salt( 'auth' ) );
 		if ( ! hash_equals( $expected, $sig ) ) {
 			return new WP_Error( 'dewey_bad_token', __( 'Invalid confirmation token.', 'dewey' ), array( 'status' => 400 ) );

@@ -82,17 +82,14 @@ final class Dewey_Engine {
 			return self::apply_non_confirm_settings_intent( $intent );
 		}
 
-		$retrieval = self::retrieve_context(
-			$question,
-			$screen_context,
-			self::is_archive_lookup_question( $question )
-		);
+		$is_lookup = self::is_archive_lookup_question( $question );
+		$retrieval = self::retrieve_context( $question, $screen_context, $is_lookup );
 		if ( is_wp_error( $retrieval ) ) {
 			return $retrieval;
 		}
 		if (
 			! empty( $retrieval['citations'] ) &&
-			self::is_archive_lookup_question( $question ) &&
+			$is_lookup &&
 			(float) ( $retrieval['confidence'] ?? 0 ) < 0.28
 		) {
 			$clarification = self::build_low_confidence_clarification(
@@ -120,10 +117,7 @@ final class Dewey_Engine {
 				),
 			);
 		}
-		if (
-			empty( $retrieval['citations'] ) &&
-			self::is_archive_lookup_question( $question )
-		) {
+		if ( empty( $retrieval['citations'] ) && $is_lookup ) {
 			$suggestions = self::build_title_suggestions(
 				$question,
 				(string) ( $retrieval['retrieval_mode'] ?? 'core' )
@@ -438,10 +432,11 @@ final class Dewey_Engine {
 	 * @return array<int,array<string,mixed>>
 	 */
 	private static function search_with_mode( string $term, string $mode, array $screen_context = array() ): array {
-		$filters = self::build_screen_filters( $screen_context );
 		if ( 'indexed' === $mode ) {
-			$results = Dewey_Indexer::search_index( $term );
-			return self::apply_screen_filters( $results, $filters );
+			return self::apply_screen_filters(
+				Dewey_Indexer::search_index( $term ),
+				self::build_screen_filters( $screen_context )
+			);
 		}
 
 		return self::search_core( $term, $screen_context );
